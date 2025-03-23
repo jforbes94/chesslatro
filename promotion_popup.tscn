@@ -1,0 +1,30 @@
+[gd_scene format=3 uid="uid://yfrexsn0nl5y"]
+
+[node name="PromotionPopup" type="Control"]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="Panel" type="Panel" parent="."]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Panel"]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="QueenButton" type="TextureButton" parent="Panel/HBoxContainer"]
+layout_mode = 2
+
+[node name="RookButton" type="TextureButton" parent="Panel/HBoxContainer"]
+layout_mode = 2
+
+[node name="BishopButton" type="TextureButton" parent="Panel/HBoxContainer"]
+layout_mode = 2
+
+[node name="KnightButton" type="TextureButton" parent="Panel/HBoxContainer"]
+layout_mode = 2

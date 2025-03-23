@@ -1,0 +1,44 @@
+[gd_scene load_steps=4 format=3 uid="uid://d07xgbooulipi"]
+
+[ext_resource type="Script" uid="uid://dc8v24ymrr21w" path="res://scripts/chess_board.gd" id="1_qdo1j"]
+[ext_resource type="Script" uid="uid://ckuqml5ge20ek" path="res://scripts/promotion_popup.gd" id="2_bfwta"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_qdo1j"]
+
+[node name="ChessBoard" type="Node2D"]
+script = ExtResource("1_qdo1j")
+
+[node name="BoardTiles" type="Node2D" parent="."]
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="PromotionPopup" type="Control" parent="UI"]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("2_bfwta")
+
+[node name="Panel" type="Panel" parent="UI/PromotionPopup"]
+layout_mode = 0
+theme_override_styles/panel = SubResource("StyleBoxFlat_qdo1j")
+
+[node name="HBoxContainer" type="HBoxContainer" parent="UI/PromotionPopup/Panel"]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="QueenButton" type="TextureButton" parent="UI/PromotionPopup/Panel/HBoxContainer"]
+layout_mode = 2
+
+[node name="RookButton" type="TextureButton" parent="UI/PromotionPopup/Panel/HBoxContainer"]
+layout_mode = 2
+
+[node name="BishopButton" type="TextureButton" parent="UI/PromotionPopup/Panel/HBoxContainer"]
+layout_mode = 2
+
+[node name="KnightButton" type="TextureButton" parent="UI/PromotionPopup/Panel/HBoxContainer"]
+layout_mode = 2
