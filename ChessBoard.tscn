@@ -11,6 +11,7 @@ script = ExtResource("1_qdo1j")
 [node name="BoardTiles" type="Node2D" parent="."]
 
 [node name="UI" type="CanvasLayer" parent="."]
+visible = false
 
 [node name="PromotionPopup" type="Control" parent="UI"]
 visible = false
@@ -23,22 +24,28 @@ grow_vertical = 2
 script = ExtResource("2_bfwta")
 
 [node name="Panel" type="Panel" parent="UI/PromotionPopup"]
+visible = false
 layout_mode = 0
 theme_override_styles/panel = SubResource("StyleBoxFlat_qdo1j")
 
 [node name="HBoxContainer" type="HBoxContainer" parent="UI/PromotionPopup/Panel"]
+visible = false
 layout_mode = 0
 offset_right = 40.0
 offset_bottom = 40.0
 
 [node name="QueenButton" type="TextureButton" parent="UI/PromotionPopup/Panel/HBoxContainer"]
+visible = false
 layout_mode = 2
 
 [node name="RookButton" type="TextureButton" parent="UI/PromotionPopup/Panel/HBoxContainer"]
+visible = false
 layout_mode = 2
 
 [node name="BishopButton" type="TextureButton" parent="UI/PromotionPopup/Panel/HBoxContainer"]
+visible = false
 layout_mode = 2
 
 [node name="KnightButton" type="TextureButton" parent="UI/PromotionPopup/Panel/HBoxContainer"]
+visible = false
 layout_mode = 2

@@ -20,9 +20,11 @@ func set_promotion_popup(popup) -> void:
 	promotion_popup.piece_selected.connect(_on_promotion_selected)
 
 func handle_tile_click(tile: ColorRect) -> void:
+	
+	print("did we get to here")
 	if promotion_popup and promotion_popup.visible:
 		return
-
+	print("what about here?")
 	var tile_name = tile.name
 	var pos = game_state.square_to_indices(tile_name)
 	var piece_code = game_state.get_piece_at(pos.x, pos.y)
