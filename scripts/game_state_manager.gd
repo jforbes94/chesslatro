@@ -28,6 +28,11 @@ func square_to_indices(square: String) -> Vector2i:
 	var file := square.unicode_at(0) - 'a'.unicode_at(0)
 	var rank := 8 - int(square.substr(1, 1))
 	return Vector2i(rank, file)
+	
+func indices_to_square_name(row: int, col: int) -> String:
+	var file = char('a'.unicode_at(0) + col)
+	var rank = str(8 - row)
+	return file + rank
 
 func is_valid_pawn_move(from: Vector2i, to: Vector2i, piece_code: String) -> bool:
 	if piece_code.length() != 2 or piece_code[1] != "p":

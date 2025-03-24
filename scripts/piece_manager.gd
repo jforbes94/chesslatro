@@ -2,7 +2,7 @@ extends Node
 
 class_name PieceManager
 
-const TILE_SIZE = 64
+const TILE_SIZE = Globals.TILE_SIZE
 
 @export var piece_theme: String = "alpha"
 
