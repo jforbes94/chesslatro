@@ -40,7 +40,7 @@ layout_mode = 2
 [node name="BishopButton" type="TextureButton" parent="UI/PromotionPopup/Panel/HBoxContainer"]
 layout_mode = 2
 
-[node name="KnightButton" type="TextureButton" parent="UI/PromotionPopup/Panel/HBoxContainer"]
+[node name="N-KnightButton" type="TextureButton" parent="UI/PromotionPopup/Panel/HBoxContainer"]
 layout_mode = 2
 
 [node name="Camera2D" type="Camera2D" parent="."]
