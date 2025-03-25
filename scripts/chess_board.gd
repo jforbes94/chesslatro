@@ -49,7 +49,7 @@ func draw_board() -> void:
 
 			tile.mouse_filter = Control.MOUSE_FILTER_STOP
 			tile.gui_input.connect(_on_tile_clicked.bind(tile_name))
-			print("🔗 Connected signal for", tile_name)
+			#print("🔗 Connected signal for", tile_name)
 
 			var label := Label.new()
 			label.text = tile_name
@@ -61,13 +61,15 @@ func draw_board() -> void:
 			$BoardTiles.add_child(tile)
 
 func _on_tile_clicked(event: InputEvent, tile_name: String) -> void:
-	print("reached On_tile_clicked")
+	#print("reached On_tile_clicked")
 	if event is InputEventMouseButton and event.pressed:
 		print("🖱️ Tile clicked:", tile_name)
 		var tile := $BoardTiles.get_node_or_null(tile_name)
 		if tile:
 			movement_manager.handle_tile_click(tile)
 
-func _input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.pressed:
-		print("🧪 _input triggered at:", get_viewport().get_mouse_position())
+#debugger function for mouse clicks not registering as intended
+#func _input(event: InputEvent) -> void:
+	#if event is InputEventMouseButton and event.pressed:
+		#print("🧪 _input triggered at:", get_viewport().get_mouse_position())
+		#

@@ -42,8 +42,10 @@ func handle_tile_click(tile: ColorRect) -> void:
 		var old_pos = game_state.square_to_indices(selected_tile.name)
 		var new_pos = pos
 		var moved_piece = game_state.get_piece_at(old_pos.x, old_pos.y)
+		
+		# checks if the move is legal and if the move would put king into check
+		if _is_valid_move(moved_piece, old_pos, new_pos) and is_move_safe(moved_piece, old_pos, new_pos):
 
-		if _is_valid_move(moved_piece, old_pos, new_pos):
 			game_state.set_piece_at(old_pos.x, old_pos.y, "")
 			game_state.set_piece_at(new_pos.x, new_pos.y, moved_piece)
 			
@@ -61,9 +63,48 @@ func handle_tile_click(tile: ColorRect) -> void:
 					pending_promotion_tile = tile  # tile is the destination
 					pending_promotion_color = moved_piece[0]
 					promotion_popup.show_promotion(moved_piece[0])
+					
+			if moved_piece[1] == "k":
+				var dx = new_pos.y - old_pos.y
+				if abs(dx) == 2:
+					var rook_from_col = 7 if dx > 0 else 0
+					var rook_to_col = new_pos.y - 1 if dx > 0 else new_pos.y + 1
+					var row = old_pos.x
+
+					var rook_from_name = game_state.indices_to_square_name(row, rook_from_col)
+					var rook_to_name = game_state.indices_to_square_name(row, rook_to_col)
+
+					var rook_from_tile = board_root.get_node_or_null(rook_from_name)
+					var rook_to_tile = board_root.get_node_or_null(rook_to_name)
+
+					if rook_from_tile and rook_to_tile:
+						var rook_piece = game_state.get_piece_at(row, rook_from_col)
+						game_state.set_piece_at(row, rook_from_col, "")
+						game_state.set_piece_at(row, rook_to_col, rook_piece)
+						move_piece(rook_from_tile, rook_to_tile, rook_piece)
 
 			move_piece(selected_tile, tile, moved_piece)
-			current_turn = "b" if current_turn == "w" else "w"
+
+			# Determine who's up next
+			var opponent_color = ""
+			if current_turn == "w":
+				opponent_color = "b"
+			else:
+				opponent_color = "w"
+
+			# Check for check/checkmate BEFORE flipping the turn
+			if game_state.is_king_in_check(opponent_color):
+				if game_state.is_checkmate(opponent_color):
+					print("♟️ CHECKMATE! " + current_turn + " wins!")
+				else:
+					print("♛ " + opponent_color + " is in check.")
+
+			# Now flip the turn
+			current_turn = opponent_color
+			
+			#checking for check_mate
+			
+
 
 		selected_tile.color = _get_tile_color(selected_tile)
 		selected_tile = null
@@ -137,3 +178,35 @@ func _on_promotion_selected(type: String) -> void:
 	pending_promotion_tile = null
 	pending_promotion_color = ""
 	promotion_popup.hide_popup()
+
+#temporary move check to understand if the move would put the king in check.
+func is_move_safe(piece_code: String, from: Vector2i, to: Vector2i) -> bool:
+	# Save current state
+	var original_target_piece = game_state.get_piece_at(to.x, to.y)
+	var original_en_passant = game_state.en_passant_target
+
+	# Apply the move
+	game_state.set_piece_at(from.x, from.y, "")
+	game_state.set_piece_at(to.x, to.y, piece_code)
+
+	# Special case: if en passant capture happens, remove captured pawn temporarily
+	var ep_captured_piece = ""
+	if piece_code[1] == "p" and game_state.en_passant_target == to:
+		var captured_pos = Vector2i(from.x, to.y)
+		ep_captured_piece = game_state.get_piece_at(captured_pos.x, captured_pos.y)
+		game_state.set_piece_at(captured_pos.x, captured_pos.y, "")
+
+	# Check for king safety
+	var color = piece_code[0]
+	var safe = not game_state.is_king_in_check(color)
+
+	# Revert state
+	game_state.set_piece_at(from.x, from.y, piece_code)
+	game_state.set_piece_at(to.x, to.y, original_target_piece)
+	game_state.en_passant_target = original_en_passant
+
+	if ep_captured_piece != "":
+		var captured_pos = Vector2i(from.x, to.y)
+		game_state.set_piece_at(captured_pos.x, captured_pos.y, ep_captured_piece)
+
+	return safe

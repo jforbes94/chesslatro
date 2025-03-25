@@ -138,36 +138,70 @@ func is_valid_queen_move(from: Vector2i, to: Vector2i, piece_code: String) -> bo
 func is_valid_king_move(from: Vector2i, to: Vector2i, piece_code: String) -> bool:
 	var delta_rank = abs(to.x - from.x)
 	var delta_file = abs(to.y - from.y)
+
+	# Normal king move (1 square in any direction)
 	if delta_rank <= 1 and delta_file <= 1 and (delta_rank != 0 or delta_file != 0):
 		var target_piece = get_piece_at(to.x, to.y)
 		if target_piece == "" or target_piece[0] != piece_code[0]:
 			return true
 
+	# Castling
 	if delta_rank == 0 and delta_file == 2:
-		if piece_code[0] == "w":
-			if to == Vector2i(7, 6):
-				if not white_kingside_castling:
-					return false
-				if get_piece_at(7, 5) == "" and get_piece_at(7, 6) == "" and get_piece_at(7, 7) == "wr":
-					return true
-			elif to == Vector2i(7, 2):
-				if not white_queenside_castling:
-					return false
-				if get_piece_at(7, 3) == "" and get_piece_at(7, 2) == "" and get_piece_at(7, 1) == "" and get_piece_at(7, 0) == "wr":
-					return true
-		elif piece_code[0] == "b":
-			if to == Vector2i(0, 6):
-				if not black_kingside_castling:
-					return false
-				if get_piece_at(0, 5) == "" and get_piece_at(0, 6) == "" and get_piece_at(0, 7) == "br":
-					return true
-			elif to == Vector2i(0, 2):
-				if not black_queenside_castling:
-					return false
-				if get_piece_at(0, 3) == "" and get_piece_at(0, 2) == "" and get_piece_at(0, 1) == "" and get_piece_at(0, 0) == "br":
-					return true
+		var color = piece_code[0]
+		var row = from.x
+
+		var kingside = to.y > from.y
+		var rook_col = 7 if kingside else 0
+		var mid_col_1 = from.y + 1 if kingside else from.y - 1
+		var mid_col_2 = from.y + 2 if kingside else from.y - 2
+		var rook_code = color + "r"
+		var castling_flag = false
+
+		if color == "w":
+			if kingside:
+				castling_flag = white_kingside_castling
+			else:
+				castling_flag = white_queenside_castling
+		else:
+			if kingside:
+				castling_flag = black_kingside_castling
+			else:
+				castling_flag = black_queenside_castling
+
+		if not castling_flag:
+			return false
+
+		# Check pieces and path
+		var rook_piece = get_piece_at(row, rook_col)
+		if rook_piece != rook_code:
+			return false
+
+		var path_clear = true
+		for col in range(min(from.y, rook_col) + 1, max(from.y, rook_col)):
+			if get_piece_at(row, col) != "":
+				path_clear = false
+				break
+
+		if not path_clear:
+			return false
+
+		# 🧠 Prevent castling through or into check
+		if is_king_in_check(color):
+			print("cannot Castle with King in Check")
+			return false
+		if does_square_threaten_king(Vector2i(row, mid_col_1), color):
+			print("Cannot Castle, interrim square threatened")
+			return false
+		if does_square_threaten_king(Vector2i(row, mid_col_2), color):
+			print("Cannot Castle, final square threatened")
+			return false
+
+		return true
 
 	return false
+
+	
+
 
 func disable_castling_rights_for(piece_code: String, square: String) -> void:
 	if piece_code == "wk":
@@ -186,3 +220,92 @@ func disable_castling_rights_for(piece_code: String, square: String) -> void:
 			black_kingside_castling = false
 		elif square == "a8":
 			black_queenside_castling = false
+
+func is_king_in_check(color: String) -> bool:
+	var king_pos := Vector2i(-1, -1)
+
+	# 1. Find the king
+	for row in range(8):
+		for col in range(8):
+			var piece = board_state[row][col]
+			if piece == color + "k":
+				king_pos = Vector2i(row, col)
+				break
+
+	if king_pos == Vector2i(-1, -1):
+		print("⚠️ King not found for color:", color)
+		return false
+
+	# 2. See if any opponent piece can move to the king
+	for row in range(8):
+		for col in range(8):
+			var piece = board_state[row][col]
+			if piece != "" and not piece.begins_with(color):
+				if does_piece_threaten(piece, Vector2i(row, col), king_pos):
+					return true
+
+	return false
+	
+	
+func does_piece_threaten(piece_code: String, from: Vector2i, to: Vector2i) -> bool:
+	match piece_code[1]:
+		"p":
+			return is_valid_pawn_move(from, to, piece_code)
+		"n":
+			return is_valid_knight_move(from, to, piece_code)
+		"b":
+			return is_valid_bishop_move(from, to, piece_code)
+		"r":
+			return is_valid_rook_move(from, to, piece_code)
+		"q":
+			return is_valid_queen_move(from, to, piece_code)
+		"k":
+			return is_valid_king_move(from, to, piece_code)
+		_:
+			return false
+
+# Specific Castling Check logic. 
+func does_square_threaten_king(pos: Vector2i, color: String) -> bool:
+	print("checking for Check in Castling")
+	# Simulate king on the square and check if opponent could attack it
+	for row in range(8):
+		for col in range(8):
+			var piece = board_state[row][col]
+			if piece != "" and not piece.begins_with(color):
+				if does_piece_threaten(piece, Vector2i(row, col), pos):
+					return true
+	return false
+
+func is_checkmate(color: String) -> bool:
+	if not is_king_in_check(color):
+		return false  # can't be checkmate if not in check
+
+	# Try every possible move for every piece of that color
+	for row in range(8):
+		for col in range(8):
+			var piece = board_state[row][col]
+			if piece != "" and piece.begins_with(color):
+				var from := Vector2i(row, col)
+
+				# Try every square on the board as a possible destination
+				for to_row in range(8):
+					for to_col in range(8):
+						var to := Vector2i(to_row, to_col)
+
+						# Only check valid moves
+						if does_piece_threaten(piece, from, to):
+							# Simulate the move
+							var captured = board_state[to.x][to.y]
+							board_state[from.x][from.y] = ""
+							board_state[to.x][to.y] = piece
+
+							var still_in_check = is_king_in_check(color)
+
+							# Undo move
+							board_state[from.x][from.y] = piece
+							board_state[to.x][to.y] = captured
+
+							if not still_in_check:
+								return false  # found a move that gets out of check
+
+	return true  # no valid escapes, it's checkmate!
