@@ -98,6 +98,8 @@ func handle_tile_click(tile: ColorRect) -> void:
 					print("♟️ CHECKMATE! " + current_turn + " wins!")
 				else:
 					print("♛ " + opponent_color + " is in check.")
+			elif game_state.is_stalemate(opponent_color):
+				print("🤝 STALEMATE! It's a draw.")
 
 			# Now flip the turn
 			current_turn = opponent_color

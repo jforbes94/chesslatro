@@ -276,9 +276,38 @@ func does_square_threaten_king(pos: Vector2i, color: String) -> bool:
 					return true
 	return false
 
+#helper function for Stalemate and Checkmate function
+func has_legal_move(color: String) -> bool:
+	for row in range(8):
+		for col in range(8):
+			var piece = board_state[row][col]
+			if piece != "" and piece.begins_with(color):
+				var from := Vector2i(row, col)
+
+				for to_row in range(8):
+					for to_col in range(8):
+						var to := Vector2i(to_row, to_col)
+
+						if does_piece_threaten(piece, from, to):
+							# Simulate move
+							var captured = board_state[to.x][to.y]
+							board_state[from.x][from.y] = ""
+							board_state[to.x][to.y] = piece
+
+							var still_in_check = is_king_in_check(color)
+
+							# Undo move
+							board_state[from.x][from.y] = piece
+							board_state[to.x][to.y] = captured
+
+							if not still_in_check:
+								return true
+	return false
+
 func is_checkmate(color: String) -> bool:
 	if not is_king_in_check(color):
-		return false  # can't be checkmate if not in check
+		return false
+	return not has_legal_move(color)
 
 	# Try every possible move for every piece of that color
 	for row in range(8):
@@ -309,3 +338,8 @@ func is_checkmate(color: String) -> bool:
 								return false  # found a move that gets out of check
 
 	return true  # no valid escapes, it's checkmate!
+	
+func is_stalemate(color: String) -> bool:
+	if is_king_in_check(color):
+		return false
+	return not has_legal_move(color)
