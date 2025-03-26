@@ -8,22 +8,21 @@ const MovementManager = preload("res://scripts/movement_manager.gd")
 const GameStateManager = preload("res://scripts/game_state_manager.gd")
 
 @onready var piece_manager = PieceManager.new()
-@onready var movement_manager = MovementManager.new()
+@onready var movement_manager = $MovementManager
 @onready var game_state = GameStateManager.new()
 
 func _ready() -> void:
 	draw_board()
 	game_state.initialize_empty_board()
 	piece_manager.place_starting_pieces($BoardTiles, game_state)
+
 	movement_manager.set_game_state(game_state)
 	movement_manager.set_piece_manager(piece_manager)
-	movement_manager.set_board_root($BoardTiles)
-	movement_manager.set_promotion_popup($UI/PromotionPopup)
 	set_process_input(true)
 	print("✅ ChessBoard is ready")
 
-	movement_manager.set_promotion_popup($UI/PromotionPopup)
-	$UI/PromotionPopup.hide_popup() 
+	#movement_manager.set_promotion_popup($UI/PromotionPopup)
+	#$UI/PromotionPopup.hide_popup() 
 
 
 
@@ -67,9 +66,11 @@ func _on_tile_clicked(event: InputEvent, tile_name: String) -> void:
 		var tile := $BoardTiles.get_node_or_null(tile_name)
 		if tile:
 			movement_manager.handle_tile_click(tile)
+			
+
 
 #debugger function for mouse clicks not registering as intended
 #func _input(event: InputEvent) -> void:
 	#if event is InputEventMouseButton and event.pressed:
 		#print("🧪 _input triggered at:", get_viewport().get_mouse_position())
-		#
+		

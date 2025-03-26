@@ -1,19 +1,22 @@
-[gd_scene load_steps=5 format=3 uid="uid://d07xgbooulipi"]
+[gd_scene load_steps=7 format=3 uid="uid://d07xgbooulipi"]
 
-[ext_resource type="Script" uid="uid://dc8v24ymrr21w" path="res://scripts/chess_board.gd" id="1_qdo1j"]
+[ext_resource type="Script" uid="uid://dc8v24ymrr21w" path="res://scripts/chess_board.gd" id="1_r4j7q"]
 [ext_resource type="Script" uid="uid://ckuqml5ge20ek" path="res://scripts/promotion_popup.gd" id="2_bfwta"]
 [ext_resource type="Script" uid="uid://c3l2eia3k22b4" path="res://scripts/camera_controller.gd" id="3_r4j7q"]
+[ext_resource type="Script" uid="uid://dbfub13dpi0rs" path="res://StockfishInterface.cs" id="4_lvqi1"]
+[ext_resource type="Script" uid="uid://dftpig1any4up" path="res://scripts/movement_manager.gd" id="5_464u0"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_qdo1j"]
 
 [node name="ChessBoard" type="Node2D"]
-script = ExtResource("1_qdo1j")
+script = ExtResource("1_r4j7q")
 
 [node name="BoardTiles" type="Node2D" parent="."]
 
 [node name="UI" type="CanvasLayer" parent="."]
 
 [node name="PromotionPopup" type="Control" parent="UI"]
+visible = false
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -46,3 +49,9 @@ layout_mode = 2
 [node name="Camera2D" type="Camera2D" parent="."]
 anchor_mode = 0
 script = ExtResource("3_r4j7q")
+
+[node name="MovementManager" type="Node" parent="."]
+script = ExtResource("5_464u0")
+
+[node name="StockfishInterface" type="Node" parent="."]
+script = ExtResource("4_lvqi1")

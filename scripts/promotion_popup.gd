@@ -34,3 +34,7 @@ func show_promotion(color: String) -> void:
 func _on_piece_selected(type: String) -> void:
 	emit_signal("piece_selected", type)
 	hide_popup()
+	
+func gui_input(event):
+	if event is InputEventMouseButton and event.pressed:
+		print("🛑 PromotionPopup intercepted a mouse click!")

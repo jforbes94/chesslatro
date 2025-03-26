@@ -9,6 +9,35 @@ var promotion_popup = null
 var pending_promotion_tile = null
 var pending_promotion_color = ""
 
+@onready var stockfish: Node = get_node("/root/ChessBoard/StockfishInterface")
+
+func _ready():
+	# Get parent (ChessBoard) to access shared nodes
+	var chessboard = get_parent()
+	
+	# Setup references to needed nodes
+	board_root = chessboard.get_node("BoardTiles")
+	promotion_popup = chessboard.get_node("UI/PromotionPopup")
+	self.stockfish = chessboard.get_node("StockfishInterface")
+	print("🔍 Class name:", stockfish.get_class())
+	print("🔍 Script reference:", stockfish.get_script())
+	if stockfish.get_script():
+		print("🔍 Script resource path:", stockfish.get_script().resource_path)
+
+	# Setup promotion signal
+	if not promotion_popup.piece_selected.is_connected(_on_promotion_selected):
+		promotion_popup.piece_selected.connect(_on_promotion_selected)
+		
+	promotion_popup.visible = false
+	promotion_popup.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	promotion_popup.hide()  # just in case
+
+	# Optional: Debug checks
+	print("✅ movement_manager is ready")
+	print("  ↳ board_root:", board_root)
+	print("  ↳ stockfish:", stockfish)
+
+
 func set_game_state(state) -> void:
 	game_state = state
 
@@ -84,25 +113,8 @@ func handle_tile_click(tile: ColorRect) -> void:
 						move_piece(rook_from_tile, rook_to_tile, rook_piece)
 
 			move_piece(selected_tile, tile, moved_piece)
-
-			# Determine who's up next
-			var opponent_color = ""
-			if current_turn == "w":
-				opponent_color = "b"
-			else:
-				opponent_color = "w"
-
-			# Check for check/checkmate BEFORE flipping the turn
-			if game_state.is_king_in_check(opponent_color):
-				if game_state.is_checkmate(opponent_color):
-					print("♟️ CHECKMATE! " + current_turn + " wins!")
-				else:
-					print("♛ " + opponent_color + " is in check.")
-			elif game_state.is_stalemate(opponent_color):
-				print("🤝 STALEMATE! It's a draw.")
-
-			# Now flip the turn
-			current_turn = opponent_color
+			end_turn()
+			
 			
 			#checking for check_mate
 			
@@ -212,3 +224,98 @@ func is_move_safe(piece_code: String, from: Vector2i, to: Vector2i) -> bool:
 		game_state.set_piece_at(captured_pos.x, captured_pos.y, ep_captured_piece)
 
 	return safe
+	
+func _make_ai_move():
+	if stockfish == null:
+		print("❌ Stockfish is still null — check _ready() or scene setup!")
+		return
+		
+	print("🔍 Type:", stockfish.get_class())
+	print("🔍 Has GetBestMoveAsync:", stockfish.has_method("GetBestMoveAsync"))
+
+
+	# Double-check the method exists before calling it (optional but safe)
+	if not stockfish.has_method("GetBestMoveAsync"):
+		print("❌ Stockfish does not have GetBestMoveAsync — maybe type issue?")
+		return
+
+	var fen: String = game_state.board_state_to_fen()
+	print("📤 Sending FEN to Stockfish:", fen)
+
+	# Call the C# method using await
+	var move = await stockfish.GetBestMoveAsync(fen, 10)
+
+	if move == "":
+		print("⚠️ Stockfish returned no move.")
+		return
+
+	print("✅ Stockfish move:", move)
+	apply_stockfish_move(move)
+
+	
+func apply_stockfish_move(move: String) -> void:
+	if move.length() < 4:
+		print("⚠️ Invalid move string:", move)
+		return
+
+	var from_file: int = move[0].unicode_at(0) - "a".unicode_at(0)
+	var from_rank: int = 8 - int(move[1])
+	var to_file: int = move[2].unicode_at(0) - "a".unicode_at(0)
+	var to_rank: int = 8 - int(move[3])
+
+	var from_pos: Vector2i = Vector2i(from_rank, from_file)
+	var to_pos: Vector2i = Vector2i(to_rank, to_file)
+
+	var from_name: String = game_state.indices_to_square_name(from_rank, from_file)
+	var to_name: String = game_state.indices_to_square_name(to_rank, to_file)
+
+	var from_tile: ColorRect = board_root.get_node_or_null(from_name)
+	var to_tile: ColorRect = board_root.get_node_or_null(to_name)
+	if not from_tile or not to_tile:
+		print("⚠️ One of the tiles was not found")
+		return
+
+	var piece: String = game_state.get_piece_at(from_pos.x, from_pos.y)
+	if piece == "":
+		print("⚠️ No piece found at Stockfish 'from' square")
+		return
+
+	# Apply promotion if needed
+	if move.length() == 5:
+		var promoted_type: String = move[4]
+		piece = "b" + promoted_type
+		game_state.set_piece_at(from_pos.x, from_pos.y, piece)
+
+	# Update game state
+	game_state.set_piece_at(from_pos.x, from_pos.y, "")
+	game_state.set_piece_at(to_pos.x, to_pos.y, piece)
+
+	# Move visually
+	move_piece(from_tile, to_tile, piece)
+
+	# Let shared logic handle turn switch and evaluation
+	end_turn()
+
+
+func end_turn() -> void:
+	var opponent_color: String = ""
+	if current_turn == "w":
+		opponent_color = "b"
+	else:
+		opponent_color = "w"
+
+	evaluate_board_state(opponent_color)
+
+	current_turn = opponent_color
+
+	if current_turn == "b":
+		call_deferred("_make_ai_move")
+		
+func evaluate_board_state(next_turn: String) -> void:
+	if game_state.is_king_in_check(next_turn):
+		if game_state.is_checkmate(next_turn):
+			print("♟️ CHECKMATE! " + current_turn + " wins!")
+		else:
+			print("♛ " + next_turn + " is in check.")
+	elif game_state.is_stalemate(next_turn):
+		print("🤝 STALEMATE! It's a draw.")

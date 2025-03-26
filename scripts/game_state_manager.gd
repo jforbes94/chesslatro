@@ -10,6 +10,14 @@ var black_queenside_castling: bool = true
 
 var en_passant_target: Vector2i = Vector2i(-1, -1)
 
+
+# for translating my piece codes to stockfish
+const FEN_MAP = {
+	"wp": "P", "wr": "R", "wn": "N", "wb": "B", "wq": "Q", "wk": "K",
+	"bp": "p", "br": "r", "bn": "n", "bb": "b", "bq": "q", "bk": "k"
+}
+
+
 func initialize_empty_board() -> void:
 	board_state.clear()
 	for _i in 8:
@@ -309,37 +317,37 @@ func is_checkmate(color: String) -> bool:
 		return false
 	return not has_legal_move(color)
 
-	# Try every possible move for every piece of that color
-	for row in range(8):
-		for col in range(8):
-			var piece = board_state[row][col]
-			if piece != "" and piece.begins_with(color):
-				var from := Vector2i(row, col)
-
-				# Try every square on the board as a possible destination
-				for to_row in range(8):
-					for to_col in range(8):
-						var to := Vector2i(to_row, to_col)
-
-						# Only check valid moves
-						if does_piece_threaten(piece, from, to):
-							# Simulate the move
-							var captured = board_state[to.x][to.y]
-							board_state[from.x][from.y] = ""
-							board_state[to.x][to.y] = piece
-
-							var still_in_check = is_king_in_check(color)
-
-							# Undo move
-							board_state[from.x][from.y] = piece
-							board_state[to.x][to.y] = captured
-
-							if not still_in_check:
-								return false  # found a move that gets out of check
-
-	return true  # no valid escapes, it's checkmate!
 	
 func is_stalemate(color: String) -> bool:
 	if is_king_in_check(color):
 		return false
 	return not has_legal_move(color)
+	
+func board_state_to_fen() -> String:
+	var fen := ""
+
+	for row in board_state:
+		var empty_count := 0
+		for cell in row:
+			if cell == "":
+				empty_count += 1
+			else:
+				if empty_count > 0:
+					fen += str(empty_count)
+					empty_count = 0
+				fen += _piece_code_to_fen(cell)
+		if empty_count > 0:
+			fen += str(empty_count)
+		fen += "/"
+
+	fen = fen.substr(0, fen.length() - 1)  # Remove trailing "/"
+	fen += " w - - 0 1"  # Placeholder for side to move, castling, etc.
+
+	return fen
+
+
+func _piece_code_to_fen(code: String) -> String:
+	if FEN_MAP.has(code):
+		return FEN_MAP[code]
+	return ""
+	
