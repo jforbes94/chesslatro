@@ -64,7 +64,7 @@ func handle_tile_click(tile: ColorRect) -> void:
 	var piece_code = game_state.get_piece_at(pos.x, pos.y)
 
 	if selected_tile == null:
-		if piece_code != "" and piece_code.begins_with(current_turn):
+		if piece_code != "" and piece_code.begins_with(GameStateManager.current_turn):
 			selected_tile = tile
 			tile.color = Color(1, 0.8, 0.2)
 	else:
@@ -231,11 +231,11 @@ func _make_ai_move():
 		return
 		
 	print("🔍 Type:", stockfish.get_class())
-	print("🔍 Has GetBestMoveAsync:", stockfish.has_method("GetBestMoveAsync"))
+	print("🔍 Has GetBestMove:", stockfish.has_method("GetBestMove"))
 
 
 	# Double-check the method exists before calling it (optional but safe)
-	if not stockfish.has_method("GetBestMoveAsync"):
+	if not stockfish.has_method("GetBestMove"):
 		print("❌ Stockfish does not have GetBestMoveAsync — maybe type issue?")
 		return
 
@@ -243,7 +243,7 @@ func _make_ai_move():
 	print("📤 Sending FEN to Stockfish:", fen)
 
 	# Call the C# method using await
-	var move = await stockfish.GetBestMoveAsync(fen, 10)
+	var move = stockfish.call("GetBestMove", fen)
 
 	if move == "":
 		print("⚠️ Stockfish returned no move.")
@@ -299,22 +299,22 @@ func apply_stockfish_move(move: String) -> void:
 
 func end_turn() -> void:
 	var opponent_color: String = ""
-	if current_turn == "w":
+	if GameStateManager.current_turn == "w":
 		opponent_color = "b"
 	else:
 		opponent_color = "w"
 
 	evaluate_board_state(opponent_color)
 
-	current_turn = opponent_color
+	GameStateManager.current_turn = opponent_color
 
-	if current_turn == "b":
+	if GameStateManager.current_turn == "b":
 		call_deferred("_make_ai_move")
 		
 func evaluate_board_state(next_turn: String) -> void:
 	if game_state.is_king_in_check(next_turn):
 		if game_state.is_checkmate(next_turn):
-			print("♟️ CHECKMATE! " + current_turn + " wins!")
+			print("♟️ CHECKMATE! " + GameStateManager.current_turn + " wins!")
 		else:
 			print("♛ " + next_turn + " is in check.")
 	elif game_state.is_stalemate(next_turn):

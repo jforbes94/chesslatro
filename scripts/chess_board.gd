@@ -5,18 +5,15 @@ const BOARD_SIZE = 8
 
 const PieceManager = preload("res://scripts/piece_manager.gd")
 const MovementManager = preload("res://scripts/movement_manager.gd")
-const GameStateManager = preload("res://scripts/game_state_manager.gd")
 
 @onready var piece_manager = PieceManager.new()
 @onready var movement_manager = $MovementManager
-@onready var game_state = GameStateManager.new()
 
 func _ready() -> void:
 	draw_board()
-	game_state.initialize_empty_board()
-	piece_manager.place_starting_pieces($BoardTiles, game_state)
-
-	movement_manager.set_game_state(game_state)
+	piece_manager.place_starting_pieces($BoardTiles, GameStateManager)
+	movement_manager.set_game_state(GameStateManager)
+	movement_manager.set_piece_manager(piece_manager)
 	movement_manager.set_piece_manager(piece_manager)
 	set_process_input(true)
 	print("✅ ChessBoard is ready")

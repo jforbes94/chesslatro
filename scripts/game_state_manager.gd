@@ -1,15 +1,17 @@
 extends Node
-class_name GameStateManager
+
+var current_turn := "w"
+var white_kingside_castling := true
+var white_queenside_castling := true
+var black_kingside_castling := true
+var black_queenside_castling := true
+var en_passant_square := "-"
 
 var board_state: Array = []
-
-var white_kingside_castling: bool = true
-var white_queenside_castling: bool = true
-var black_kingside_castling: bool = true
-var black_queenside_castling: bool = true
-
 var en_passant_target: Vector2i = Vector2i(-1, -1)
 
+func _ready():
+	initialize_empty_board()
 
 # for translating my piece codes to stockfish
 const FEN_MAP = {
@@ -341,7 +343,12 @@ func board_state_to_fen() -> String:
 		fen += "/"
 
 	fen = fen.substr(0, fen.length() - 1)  # Remove trailing "/"
-	fen += " w - - 0 1"  # Placeholder for side to move, castling, etc.
+
+	var turn = GameStateManager.current_turn
+	var castling_rights = get_fen_castling_rights_fen()
+	var en_passant = GameStateManager.en_passant_square
+
+	fen += " %s %s %s" % [turn, castling_rights, en_passant]
 
 	return fen
 
@@ -351,3 +358,16 @@ func _piece_code_to_fen(code: String) -> String:
 		return FEN_MAP[code]
 	return ""
 	
+func get_fen_castling_rights_fen() -> String:
+	var rights := ""
+	if white_kingside_castling:
+		rights += "K"
+	if white_queenside_castling:
+		rights += "Q"
+	if black_kingside_castling:
+		rights += "k"
+	if black_queenside_castling:
+		rights += "q"
+	if rights == "":
+		rights = "-"
+	return rights
