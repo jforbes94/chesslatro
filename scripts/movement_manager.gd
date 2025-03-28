@@ -9,12 +9,20 @@ var promotion_popup = null
 var pending_promotion_tile = null
 var pending_promotion_color = ""
 
+var last_moved_tile: ColorRect = null
+
+const COLOR_SELECTED = Color(1, 0.8, 0.2)  # gold
+const COLOR_LAST_MOVE = Color(0.4, 0.9, 0.4)  # green
+
 
 @onready var stockfish: Node = get_node("/root/ChessBoard/StockfishInterface")
 
 func _ready():
 	# Get parent (ChessBoard) to access shared nodes
 	var chessboard = get_parent()
+	
+
+	
 	
 	# Setup references to needed nodes
 	board_root = chessboard.get_node("BoardTiles")
@@ -67,7 +75,7 @@ func handle_tile_click(tile: ColorRect) -> void:
 	if selected_tile == null:
 		if piece_code != "" and piece_code.begins_with(GameStateManager.current_turn):
 			selected_tile = tile
-			tile.color = Color(1, 0.8, 0.2)
+			tile.color = COLOR_SELECTED 
 	else:
 		var old_pos = game_state.square_to_indices(selected_tile.name)
 		var new_pos = pos
@@ -142,6 +150,9 @@ func _is_valid_move(piece_code: String, old_pos: Vector2i, new_pos: Vector2i) ->
 			return false
 
 func move_piece(from_tile: ColorRect, to_tile: ColorRect, piece_code: String) -> void:
+	if last_moved_tile and is_instance_valid(last_moved_tile):
+		last_moved_tile.color = _get_tile_color(last_moved_tile)
+	
 	remove_piece_from_tile(to_tile)
 	remove_piece_from_tile(from_tile)
 	
@@ -150,7 +161,8 @@ func move_piece(from_tile: ColorRect, to_tile: ColorRect, piece_code: String) ->
 	GameStateManager.disable_castling_rights_for(piece_code, from_tile.name)
 			
 	
-	
+	to_tile.color = COLOR_LAST_MOVE
+	last_moved_tile = to_tile
 	
 
 	var sprite = piece_manager.create_piece_sprite(piece_code)
@@ -233,20 +245,19 @@ func is_move_safe(piece_code: String, from: Vector2i, to: Vector2i) -> bool:
 		game_state.set_piece_at(captured_pos.x, captured_pos.y, ep_captured_piece)
 
 	return safe
-	
+
+## seperate from apply_stockfish_moves because I anticpate bugs and potentialy differences in logic
 func _make_ai_move():
 	if stockfish == null:
 		print("❌ Stockfish is still null — check _ready() or scene setup!")
 		return
 		
-	print("🔍 Type:", stockfish.get_class())
-	print("🔍 Has GetBestMove:", stockfish.has_method("GetBestMove"))
-
-
+	#print("🔍 Type:", stockfish.get_class())
+	#print("🔍 Has GetBestMove:", stockfish.has_method("GetBestMove"))
 	# Double-check the method exists before calling it (optional but safe)
-	if not stockfish.has_method("GetBestMove"):
-		print("❌ Stockfish does not have GetBestMoveAsync — maybe type issue?")
-		return
+	#if not stockfish.has_method("GetBestMove"):
+		#print("❌ Stockfish does not have GetBestMoveAsync — maybe type issue?")
+		#return
 
 	var fen: String = game_state.board_state_to_fen()
 	print("📤 Sending FEN to Stockfish:", fen)
@@ -254,15 +265,16 @@ func _make_ai_move():
 	# Call the C# method using await
 	var move = stockfish.call("GetBestMove", fen)
 
-	if move == "":
-		print("⚠️ Stockfish returned no move.")
-		return
+	#if move == "":
+		#print("⚠️ Stockfish returned no move.")
+		#return
 
 	print("✅ Stockfish move:", move)
 	apply_stockfish_move(move)
 
 	
 func apply_stockfish_move(move: String) -> void:
+	await get_tree().create_timer(1).timeout
 	if move.length() < 4:
 		print("⚠️ Invalid move string:", move)
 		return

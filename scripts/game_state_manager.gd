@@ -13,6 +13,8 @@ var en_passant_target: Vector2i = Vector2i(-1, -1)
 
 func _ready():
 	initialize_empty_board()
+	
+
 
 # for translating my piece codes to stockfish
 const FEN_MAP = {
