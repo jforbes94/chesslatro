@@ -7,12 +7,23 @@ const TILE_SIZE = Globals.TILE_SIZE
 @export var piece_theme: String = "alpha"
 
 func place_starting_pieces(parent: Node, game_state: Node) -> void:
+
+	
+	#var starting_positions = {
+		#"a2": "wp", "b2": "wp", "c2": "wp", "d2": "wp", "e2": "wp", "f2": "wp", "g2": "wp", "h2": "wp",
+		#"a7": "bp", "b7": "bp", "c7": "bp", "d7": "bp", "e7": "bp", "f7": "bp", "g7": "bp", "h7": "bp",
+		#"a1": "wr", "b1": "wn", "c1": "wb", "d1": "wq", "e1": "wk", "f1": "wb", "g1": "wn", "h1": "wr",
+		#"a8": "br", "e8": "bk", "h8": "br",
+	#}
+	
 	var starting_positions = {
 		"a2": "wp", "b2": "wp", "c2": "wp", "d2": "wp", "e2": "wp", "f2": "wp", "g2": "wp", "h2": "wp",
 		"a7": "bp", "b7": "bp", "c7": "bp", "d7": "bp", "e7": "bp", "f7": "bp", "g7": "bp", "h7": "bp",
 		"a1": "wr", "b1": "wn", "c1": "wb", "d1": "wq", "e1": "wk", "f1": "wb", "g1": "wn", "h1": "wr",
 		"a8": "br", "b8": "bn", "c8": "bb", "d8": "bq", "e8": "bk", "f8": "bb", "g8": "bn", "h8": "br",
 	}
+
+
 
 	for square_name in starting_positions.keys():
 		var piece_code = starting_positions[square_name]

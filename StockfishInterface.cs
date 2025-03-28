@@ -5,7 +5,11 @@ using System.IO;
 [GlobalClass]
 public partial class StockfishInterface : Node
 {
-	[Export] public string StockfishPath { get; set; } = "res://stockfish/stockfish";
+	[Export]
+	public string StockfishPath { get; set; } = "res://stockfish/stockfish";
+
+	// Toggle this to true if you want to see all Stockfish output
+	private bool debugStockfishOutput = false;
 
 	public string GetBestMove(string fen)
 	{
@@ -21,26 +25,49 @@ public partial class StockfishInterface : Node
 			}
 		};
 
-		process.Start();
+		string bestMove = null;
 
-		process.StandardInput.WriteLine($"position fen {fen}");
-		process.StandardInput.WriteLine("go depth 10");
-		process.StandardInput.Flush();
-
-		string bestMove = "";
-
-		while (!process.StandardOutput.EndOfStream)
+		try
 		{
-			var line = process.StandardOutput.ReadLine();
-			if (line.StartsWith("bestmove"))
-			{
-				bestMove = line.Split(' ')[1];
-				break;
-			}
-		}
+			process.Start();
 
-		process.StandardInput.WriteLine("quit");
-		process.WaitForExit();
+			process.StandardInput.WriteLine($"position fen {fen}");
+			process.StandardInput.WriteLine("go depth 10");
+			process.StandardInput.Flush();
+
+			while (true)
+			{
+				string line = process.StandardOutput.ReadLine();
+				if (line == null)
+					break;
+
+				if (debugStockfishOutput)
+					GD.Print("Stockfish: " + line);
+
+				if (line.StartsWith("bestmove"))
+				{
+					var parts = line.Split(' ');
+					if (parts.Length >= 2)
+					{
+						bestMove = parts[1];
+						GD.Print("Best move: " + bestMove);
+					}
+					else
+					{
+						GD.Print("Warning: Malformed bestmove line");
+					}
+					break;
+				}
+			}
+
+			process.StandardInput.WriteLine("quit");
+			process.StandardInput.Flush();
+			process.WaitForExit();
+		}
+		catch (System.Exception e)
+		{
+			GD.PrintErr("Stockfish error: " + e.Message);
+		}
 
 		return bestMove;
 	}

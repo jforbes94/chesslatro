@@ -9,6 +9,7 @@ var promotion_popup = null
 var pending_promotion_tile = null
 var pending_promotion_color = ""
 
+
 @onready var stockfish: Node = get_node("/root/ChessBoard/StockfishInterface")
 
 func _ready():
@@ -143,6 +144,14 @@ func _is_valid_move(piece_code: String, old_pos: Vector2i, new_pos: Vector2i) ->
 func move_piece(from_tile: ColorRect, to_tile: ColorRect, piece_code: String) -> void:
 	remove_piece_from_tile(to_tile)
 	remove_piece_from_tile(from_tile)
+	
+	print("Piece_Code:" + piece_code)
+	print("From Tile.Name :" + from_tile.name)
+	GameStateManager.disable_castling_rights_for(piece_code, from_tile.name)
+			
+	
+	
+	
 
 	var sprite = piece_manager.create_piece_sprite(piece_code)
 	to_tile.add_child(sprite)
@@ -279,12 +288,63 @@ func apply_stockfish_move(move: String) -> void:
 	if piece == "":
 		print("⚠️ No piece found at Stockfish 'from' square")
 		return
+		
+	# Handle castling explicitly by move string
+	var is_castling := false
+	var rook_from: Vector2i
+	var rook_to: Vector2i
+	var rook_piece := "br" if piece.begins_with("b") else "wr"
+	var rook_from_name: String = ""
+	var rook_to_name: String = ""
+
+	match move:
+		"e1g1":
+			is_castling = true
+			rook_from = Vector2i(7, 7)
+			rook_to = Vector2i(7, 5)
+			rook_from_name = game_state.indices_to_square_name(7, 7)
+			rook_to_name = game_state.indices_to_square_name(7, 5)
+		"e1c1":
+			is_castling = true
+			rook_from = Vector2i(7, 0)
+			rook_to = Vector2i(7, 3)
+			rook_from_name = game_state.indices_to_square_name(7, 0)
+			rook_to_name = game_state.indices_to_square_name(7, 3)
+		"e8g8":
+			is_castling = true
+			rook_from = Vector2i(0, 7)
+			rook_to = Vector2i(0, 5)
+			rook_from_name = game_state.indices_to_square_name(0, 7)
+			rook_to_name = game_state.indices_to_square_name(0, 5)
+		"e8c8":
+			is_castling = true
+			rook_from = Vector2i(0, 0)
+			rook_to = Vector2i(0, 3)
+			rook_from_name = game_state.indices_to_square_name(0, 0)
+			rook_to_name = game_state.indices_to_square_name(0, 3)
+	if is_castling:
+		# Update game state for rook
+		game_state.set_piece_at(rook_from.x, rook_from.y, "")
+		game_state.set_piece_at(rook_to.x, rook_to.y, rook_piece)
+
+		# Move rook visually
+		rook_from_name = game_state.indices_to_square_name(rook_from.x, rook_from.y)
+		rook_to_name = game_state.indices_to_square_name(rook_to.x, rook_to.y)
+
+		var rook_from_tile: ColorRect = board_root.get_node_or_null(rook_from_name)
+		var rook_to_tile: ColorRect = board_root.get_node_or_null(rook_to_name)
+		if rook_from_tile and rook_to_tile:
+			move_piece(rook_from_tile, rook_to_tile, rook_piece)
+		else:
+			print("⚠️ Rook tiles not found for castling")
 
 	# Apply promotion if needed
 	if move.length() == 5:
 		var promoted_type: String = move[4]
 		piece = "b" + promoted_type
 		game_state.set_piece_at(from_pos.x, from_pos.y, piece)
+		
+	
 
 	# Update game state
 	game_state.set_piece_at(from_pos.x, from_pos.y, "")
@@ -319,3 +379,4 @@ func evaluate_board_state(next_turn: String) -> void:
 			print("♛ " + next_turn + " is in check.")
 	elif game_state.is_stalemate(next_turn):
 		print("🤝 STALEMATE! It's a draw.")
+		

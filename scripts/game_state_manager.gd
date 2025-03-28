@@ -6,6 +6,7 @@ var white_queenside_castling := true
 var black_kingside_castling := true
 var black_queenside_castling := true
 var en_passant_square := "-"
+var move_log: Array = []
 
 var board_state: Array = []
 var en_passant_target: Vector2i = Vector2i(-1, -1)
@@ -166,18 +167,19 @@ func is_valid_king_move(from: Vector2i, to: Vector2i, piece_code: String) -> boo
 		var mid_col_2 = from.y + 2 if kingside else from.y - 2
 		var rook_code = color + "r"
 		var castling_flag = false
-
+		
+		#could probably delete the black portion since that's handled by stockfish but want to be redundant if we disable stockfish
 		if color == "w":
 			if kingside:
-				castling_flag = white_kingside_castling
+				castling_flag = GameStateManager.white_kingside_castling
 			else:
-				castling_flag = white_queenside_castling
+				castling_flag = GameStateManager.white_queenside_castling
 		else:
 			if kingside:
-				castling_flag = black_kingside_castling
+				castling_flag = GameStateManager.black_kingside_castling
 			else:
-				castling_flag = black_queenside_castling
-
+				castling_flag = GameStateManager.black_queenside_castling
+				
 		if not castling_flag:
 			return false
 
@@ -215,21 +217,22 @@ func is_valid_king_move(from: Vector2i, to: Vector2i, piece_code: String) -> boo
 
 func disable_castling_rights_for(piece_code: String, square: String) -> void:
 	if piece_code == "wk":
-		white_kingside_castling = false
-		white_queenside_castling = false
+		GameStateManager.white_kingside_castling = false
+		GameStateManager.white_queenside_castling = false
 	elif piece_code == "bk":
-		black_kingside_castling = false
-		black_queenside_castling = false
+		GameStateManager.black_kingside_castling = false
+		GameStateManager.black_queenside_castling = false
 	elif piece_code == "wr":
 		if square == "h1":
-			white_kingside_castling = false
+			GameStateManager.white_kingside_castling = false
 		elif square == "a1":
-			white_queenside_castling = false
+			GameStateManager.white_queenside_castling = false
 	elif piece_code == "br":
 		if square == "h8":
-			black_kingside_castling = false
+			GameStateManager.black_kingside_castling = false
 		elif square == "a8":
-			black_queenside_castling = false
+			GameStateManager.black_queenside_castling = false
+
 
 func is_king_in_check(color: String) -> bool:
 	var king_pos := Vector2i(-1, -1)
