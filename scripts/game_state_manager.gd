@@ -7,6 +7,14 @@ var black_kingside_castling := true
 var black_queenside_castling := true
 var en_passant_square := "-"
 
+#Adding flags referenced and set within movement_manager IF piece moves
+var white_king_moved := false
+var white_queenside_rook_moved := false
+var white_kingside_rook_moved := false
+var black_king_moved := false
+var black_queenside_rook_moved := false
+var black_kingside_rook_moved := false
+
 var board_state: Array = []
 var en_passant_target: Vector2i = Vector2i(-1, -1)
 
@@ -168,15 +176,46 @@ func is_valid_king_move(from: Vector2i, to: Vector2i, piece_code: String) -> boo
 		var castling_flag = false
 
 		if color == "w":
+			# New script
+			if white_king_moved:
+				# If the king has moved "white_king_moved" should now read as "true"
+				return false
 			if kingside:
+				#white kingside rook
 				castling_flag = white_kingside_castling
+				if white_kingside_rook_moved:
+					return false
 			else:
+				#white queenside rook
 				castling_flag = white_queenside_castling
+				if white_queenside_rook_moved:
+					return false
+			
 		else:
+			if black_king_moved:
+				return false
 			if kingside:
+				#black kingside rook
 				castling_flag = black_kingside_castling
+				if black_kingside_rook_moved:
+					return false
 			else:
+				#black queenside rook
 				castling_flag = black_queenside_castling
+				if black_queenside_rook_moved:
+					return false
+				
+			# OLD SCRIPT - REMOVE IF SATISFIED
+			#if kingside:
+				#castling_flag = white_kingside_castling
+			#else:
+				#castling_flag = white_queenside_castling
+		#else:
+			#if kingside:
+				#castling_flag = black_kingside_castling
+			#else:
+				#castling_flag = black_queenside_castling
+
 
 		if not castling_flag:
 			return false

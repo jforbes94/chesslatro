@@ -78,6 +78,24 @@ func handle_tile_click(tile: ColorRect) -> void:
 			game_state.set_piece_at(old_pos.x, old_pos.y, "")
 			game_state.set_piece_at(new_pos.x, new_pos.y, moved_piece)
 			
+			# This should flag if the kings or rooks have moved from their starting positions at all
+			# Flags created in game_state_manager, starting off false, set to true if k/r has moved
+			# would need to add to this for enhanced rook or king pieces in future since those would have a different code possibly
+			if moved_piece == "wk":
+				game_state.white_king_moved = true
+			elif moved_piece == "wr":
+				if old_pos == Vector2i(7,0):
+					game_state.white_queenside_rook_moved = true
+				elif old_pos == Vector2i(7,7):
+					game_state.white_kingside_rook_moved = true
+			elif moved_piece == "bk":
+				game_state.white_king_moved = true
+			elif moved_piece == "br":
+				if old_pos == Vector2i(0,0):
+					game_state.white_queenside_rook_moved = true
+				elif old_pos == Vector2i(0,7):
+					game_state.white_kingside_rook_moved = true
+			
 			#checks if it was an En Passant capture
 			if moved_piece[1] == "p" and game_state.en_passant_target == new_pos:
 				var captured_pawn_row = old_pos.x  # The pawn is on the same rank the moving pawn came from
