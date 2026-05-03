@@ -6,36 +6,15 @@ const TILE_SIZE = Globals.TILE_SIZE
 
 @export var piece_theme: String = "alpha"
 
-func place_starting_pieces(parent: Node, game_state: Node) -> void:
+func place_starting_pieces(parent: Node, game_state: Node, starting_positions: Dictionary = {}) -> void:
+	if starting_positions.is_empty():
+		starting_positions = LevelConfig.get_starting_positions(RunState.current_level)
 
-	
-	#var starting_positions = {
-		#"a2": "wp", "b2": "wp", "c2": "wp", "d2": "wp", "e2": "wp", "f2": "wp", "g2": "wp", "h2": "wp",
-		#"a7": "bp", "b7": "bp", "c7": "bp", "d7": "bp", "e7": "bp", "f7": "bp", "g7": "bp", "h7": "bp",
-		#"a1": "wr", "b1": "wn", "c1": "wb", "d1": "wq", "e1": "wk", "f1": "wb", "g1": "wn", "h1": "wr",
-		#"a8": "br", "e8": "bk", "h8": "br",
-	#}
-	
-	#var starting_positions = {
-		#"a2": "wp", "b2": "wp", "c2": "wp", "d2": "wp", "e2": "wp", "f2": "wp", "g2": "wp", "h2": "wp",
-		#"a7": "bp", "b7": "bp", "c7": "bp", "d7": "bp", "e7": "bp", "f7": "bp", "g7": "bp", "h7": "bp",
-		#"a1": "wr", "b1": "wn", "c1": "wb", "d1": "wq", "e1": "wk", "f1": "wb", "g1": "wn", "h1": "wr",
-		#"a8": "br", "b8": "bn", "c8": "bb", "d8": "bq", "e8": "bk", "f8": "bb", "g8": "bn", "h8": "br",
-	#}
-	
-	var starting_positions = {
-		"a2": "wp", "b2": "wp", "c2": "wp", "d2": "wp", "e2": "wp", "f2": "wp", "g2": "wp", "h2": "wp",
-		"a7": "bp", "b7": "bp", "c7": "bp", "d7": "bp", "e7": "bp", "f7": "bp", "g7": "bp", "h7": "bp",
-		"a1": "wr", "b1": "wn", "c1": "wb", "d1": "wq", "e1": "wk", "f1": "wb", "g1": "wn", "h1": "wr",
-		 "b8": "bn", "c8": "bb", "d8": "bq", "e8": "bk", "f8": "bb", "g8": "bn",
-	}
-
-	if !"h8" in starting_positions or starting_positions["h8"] != "br":
+	if not "h8" in starting_positions or starting_positions["h8"] != "br":
 		GameStateManager.black_kingside_castling = false
 
-	if !"a8" in starting_positions or starting_positions["a8"] != "br":
+	if not "a8" in starting_positions or starting_positions["a8"] != "br":
 		GameStateManager.black_queenside_castling = false
-
 
 	for square_name in starting_positions.keys():
 		var piece_code = starting_positions[square_name]
@@ -47,6 +26,17 @@ func place_starting_pieces(parent: Node, game_state: Node) -> void:
 			# Update game state
 			var coords: Vector2i = game_state.square_to_indices(square_name)
 			game_state.set_piece_at(coords.x, coords.y, piece_code)
+
+func place_pieces_from_board_state(parent: Node, game_state: Node) -> void:
+	for rank in range(8):
+		for file in range(8):
+			var piece_code = game_state.get_piece_at(rank, file)
+			if piece_code == "":
+				continue
+			var square_name = game_state.indices_to_square_name(rank, file)
+			var tile = parent.get_node_or_null(square_name)
+			if tile:
+				tile.add_child(create_piece_sprite(piece_code))
 
 func create_piece_sprite(piece_code: String) -> TextureRect:
 	var sprite := TextureRect.new()

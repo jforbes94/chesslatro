@@ -18,6 +18,9 @@ config/icon="res://icon.svg"
 [autoload]
 
 GameStateManager="*res://scripts/game_state_manager.gd"
+RunState="*res://scripts/run_state.gd"
+LevelConfig="*res://scripts/level_config.gd"
+PuzzleManager="*res://scripts/puzzle_manager.gd"
 
 [dotnet]
 

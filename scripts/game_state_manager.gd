@@ -22,6 +22,46 @@ const FEN_MAP = {
 	"bp": "p", "br": "r", "bn": "n", "bb": "b", "bq": "q", "bk": "k"
 }
 
+const FEN_REVERSE = {
+	"P": "wp", "R": "wr", "N": "wn", "B": "wb", "Q": "wq", "K": "wk",
+	"p": "bp", "r": "br", "n": "bn", "b": "bb", "q": "bq", "k": "bk"
+}
+
+func load_from_fen(fen: String) -> void:
+	initialize_empty_board()
+	var parts = fen.split(" ")
+	if parts.size() < 4:
+		push_error("Invalid FEN: " + fen)
+		return
+
+	# Board position
+	var ranks = parts[0].split("/")
+	for rank_idx in range(8):
+		var file_idx = 0
+		for ch in ranks[rank_idx]:
+			if ch.is_valid_int():
+				file_idx += int(ch)
+			elif FEN_REVERSE.has(ch):
+				set_piece_at(rank_idx, file_idx, FEN_REVERSE[ch])
+				file_idx += 1
+
+	# Active color
+	current_turn = parts[1]
+
+	# Castling rights
+	var castling = parts[2]
+	white_kingside_castling  = "K" in castling
+	white_queenside_castling = "Q" in castling
+	black_kingside_castling  = "k" in castling
+	black_queenside_castling = "q" in castling
+
+	# En passant
+	en_passant_square = parts[3]
+	if en_passant_square != "-":
+		en_passant_target = square_to_indices(en_passant_square)
+	else:
+		en_passant_target = Vector2i(-1, -1)
+
 
 func initialize_empty_board() -> void:
 	board_state.clear()

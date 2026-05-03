@@ -1,3 +1,17 @@
+# Secrets
+dev_resources/.env
+
+# Large puzzle databases (regenerate with extract_puzzles.py)
+puzzles_easy.json
+puzzles_medium.json
+puzzles_hard.json
+puzzles.json
+dev_resources/lichess_db_puzzle.csv.zst
+
+# Stockfish binaries
+stockfish/fairy-stockfish.exe
+stockfish/stockfish.exe
+
 # Godot 4+ specific ignores
 .godot/
 /android/
