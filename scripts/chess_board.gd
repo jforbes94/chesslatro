@@ -29,6 +29,10 @@ var store_content:    VBoxContainer
 
 var current_puzzle_difficulty: String = "medium"
 var difficulty_overlay: ColorRect
+var main_menu_overlay:  ColorRect
+var run_end_overlay:    ColorRect
+var run_end_label:      Label
+var settings_panel:     ColorRect
 
 # Timers
 var puzzle_timer_active: bool  = false
@@ -47,6 +51,8 @@ func _ready() -> void:
 	_build_hud()
 	_build_store_overlay()
 	_build_difficulty_screen()
+	_build_run_end_overlay()
+	_build_main_menu()
 	movement_manager.match_over.connect(_on_match_over)
 	movement_manager.wrong_move.connect(_on_wrong_move)
 	movement_manager.puzzle_complete.connect(_on_puzzle_complete)
@@ -85,6 +91,191 @@ func _style_button(btn: Button, color: Color = COLOR_BTN) -> void:
 	btn.add_theme_color_override("font_pressed_color", Color.WHITE)
 	btn.add_theme_color_override("font_disabled_color",Color(0.6, 0.6, 0.6))
 
+# --- Main Menu ---
+
+func _build_main_menu() -> void:
+	var board_px = TILE_SIZE * BOARD_SIZE
+	var cx       = board_px / 2
+
+	main_menu_overlay = ColorRect.new()
+	main_menu_overlay.color       = Color(0.05, 0.05, 0.10, 0.98)
+	main_menu_overlay.position    = Vector2(0, 0)
+	main_menu_overlay.size        = Vector2(board_px, board_px)
+	main_menu_overlay.z_index     = 60
+	main_menu_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(main_menu_overlay)
+
+	var title = Label.new()
+	title.text = "ChessLatro"
+	title.add_theme_font_size_override("font_size", 52)
+	title.add_theme_color_override("font_color", COLOR_GOLD)
+	title.position = Vector2(cx - 145, 80)
+	main_menu_overlay.add_child(title)
+
+	var tagline = Label.new()
+	tagline.text = "Solve. Upgrade. Conquer."
+	tagline.add_theme_font_size_override("font_size", 15)
+	tagline.add_theme_color_override("font_color", Color(0.75, 0.75, 0.75))
+	tagline.position = Vector2(cx - 100, 148)
+	main_menu_overlay.add_child(tagline)
+
+	var new_run_btn = Button.new()
+	new_run_btn.text     = "New Run"
+	new_run_btn.size     = Vector2(240, 58)
+	new_run_btn.position = Vector2(cx - 120, 230)
+	new_run_btn.pressed.connect(_on_main_menu_new_run)
+	_style_button(new_run_btn, Color(0.18, 0.48, 0.18))
+	main_menu_overlay.add_child(new_run_btn)
+
+	var settings_btn = Button.new()
+	settings_btn.text     = "Settings"
+	settings_btn.size     = Vector2(240, 48)
+	settings_btn.position = Vector2(cx - 120, 304)
+	settings_btn.pressed.connect(_on_main_menu_settings)
+	_style_button(settings_btn, Color(0.28, 0.28, 0.38))
+	main_menu_overlay.add_child(settings_btn)
+
+	# Settings panel (hidden by default)
+	settings_panel = ColorRect.new()
+	settings_panel.color    = Color(0.10, 0.10, 0.18, 0.98)
+	settings_panel.position = Vector2(cx - 160, 370)
+	settings_panel.size     = Vector2(320, 180)
+	settings_panel.visible  = false
+	main_menu_overlay.add_child(settings_panel)
+
+	var settings_title = Label.new()
+	settings_title.text = "Settings"
+	settings_title.add_theme_font_size_override("font_size", 16)
+	settings_title.add_theme_color_override("font_color", COLOR_GOLD)
+	settings_title.position = Vector2(12, 10)
+	settings_panel.add_child(settings_title)
+
+	var info_lines = [
+		"Puzzle timer:    15 seconds per puzzle",
+		"Boss timer:      3 minutes + 2s per move",
+		"Puzzle mode:     Strict (exact solution required)",
+		"AI strength:     Depth 10, top-3 random pick",
+		"Army upgrades:   Persist across all runs",
+	]
+	var y = 40
+	for line in info_lines:
+		var lbl = Label.new()
+		lbl.text = line
+		lbl.add_theme_font_size_override("font_size", 11)
+		lbl.add_theme_color_override("font_color", Color(0.8, 0.8, 0.8))
+		lbl.position = Vector2(12, y)
+		settings_panel.add_child(lbl)
+		y += 22
+
+	var version_lbl = Label.new()
+	version_lbl.text = "ChessLatro — 2026"
+	version_lbl.add_theme_font_size_override("font_size", 10)
+	version_lbl.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
+	version_lbl.position = Vector2(cx - 60, board_px - 36)
+	main_menu_overlay.add_child(version_lbl)
+
+func _on_main_menu_new_run() -> void:
+	_hide(main_menu_overlay)
+	_show(difficulty_overlay)
+
+func _on_main_menu_settings() -> void:
+	settings_panel.visible = not settings_panel.visible
+
+# --- Run End Overlay ---
+
+func _build_run_end_overlay() -> void:
+	var board_px = TILE_SIZE * BOARD_SIZE
+
+	run_end_overlay = ColorRect.new()
+	run_end_overlay.color       = Color(0.04, 0.04, 0.08, 0.92)
+	run_end_overlay.position    = Vector2(0, 0)
+	run_end_overlay.size        = Vector2(board_px, board_px)
+	run_end_overlay.z_index     = 45
+	run_end_overlay.visible     = false
+	run_end_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(run_end_overlay)
+
+	run_end_label = Label.new()
+	run_end_label.add_theme_font_size_override("font_size", 15)
+	run_end_label.add_theme_color_override("font_color", Color.WHITE)
+	run_end_label.position    = Vector2(board_px / 2 - 160, board_px / 2 - 130)
+	run_end_label.size        = Vector2(320, 200)
+	run_end_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	run_end_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	run_end_overlay.add_child(run_end_label)
+
+	var play_again_btn = Button.new()
+	play_again_btn.size     = Vector2(210, 50)
+	play_again_btn.position = Vector2(board_px / 2 - 110, board_px / 2 + 80)
+	play_again_btn.text     = "Play Again →"
+	play_again_btn.pressed.connect(_on_run_end_play_again)
+	_style_button(play_again_btn, Color(0.18, 0.48, 0.18))
+	run_end_overlay.add_child(play_again_btn)
+
+	var menu_btn = Button.new()
+	menu_btn.size     = Vector2(210, 40)
+	menu_btn.position = Vector2(board_px / 2 - 110, board_px / 2 + 140)
+	menu_btn.text     = "Main Menu"
+	menu_btn.pressed.connect(_on_run_end_main_menu)
+	_style_button(menu_btn, Color(0.28, 0.28, 0.38))
+	run_end_overlay.add_child(menu_btn)
+
+func _show_run_end(won: bool) -> void:
+	var upgrades = RunState.army.values().filter(func(p): return p != "wp" and p[1] != "k" and p[1] != "r" and p[1] != "n" and p[1] != "b" or true).size()
+	var non_standard = 0
+	var default_army = ["wr","wn","wb","wq","wk","wb","wn","wr","wp","wp","wp","wp","wp","wp","wp","wp"]
+	for piece in RunState.army.values():
+		if not piece in default_army:
+			non_standard += 1
+
+	if won:
+		RunState.run_number += 1
+		run_end_label.add_theme_color_override("font_color", COLOR_GOLD)
+		run_end_label.text = (
+			"Victory!\n\n" +
+			"Run %d Complete\n\n" % (RunState.run_number - 1) +
+			"Puzzles Solved:   %d / 5\n" % RunState.puzzles_solved +
+			"Gold Earned:      %d\n" % RunState.gold_earned +
+			"Army Upgrades:    %d\n" % non_standard +
+			"Boss Moves:       %d\n\n" % RunState.boss_moves +
+			"Your army grows stronger..."
+		)
+	else:
+		run_end_label.add_theme_color_override("font_color", Color.WHITE)
+		run_end_label.text = (
+			"Defeated.\n\n" +
+			"Run %d\n\n" % RunState.run_number +
+			"Puzzles Solved:   %d / 5\n" % RunState.puzzles_solved +
+			"Gold Earned:      %d\n" % RunState.gold_earned +
+			"Boss Moves:       %d\n\n" % RunState.boss_moves +
+			"Better luck next time."
+		)
+
+	$BoardTiles.modulate = Color(0.55, 0.55, 0.55)
+	run_end_overlay.modulate.a = 0.0
+	run_end_overlay.visible    = true
+	run_end_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	var tween = create_tween().set_trans(Tween.TRANS_CUBIC)
+	tween.tween_property(run_end_overlay, "modulate:a", 1.0, 0.3)
+
+func _on_run_end_play_again() -> void:
+	run_end_overlay.visible      = false
+	run_end_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	$BoardTiles.modulate         = Color.WHITE
+	RunState.reset_run()
+	_reset_board()
+	_load_puzzle()
+	_refresh_hud()
+
+func _on_run_end_main_menu() -> void:
+	run_end_overlay.visible      = false
+	run_end_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	$BoardTiles.modulate         = Color.WHITE
+	RunState.reset_run()
+	_reset_board()
+	_refresh_hud()
+	_show(main_menu_overlay)
+
 # --- Timers ---
 
 func _process(delta: float) -> void:
@@ -112,11 +303,12 @@ func _process(delta: float) -> void:
 		if boss_time_left <= 0.0:
 			boss_timer_active = false
 			timer_label.text = "⏱  0:00"
-			movement_manager.emit_signal("match_over", "timeout")
+			_show_run_end(false)
 
 func _on_white_moved() -> void:
 	if boss_timer_active:
 		boss_time_left = minf(boss_time_left + BOSS_INCREMENT, 180.0)
+		RunState.boss_moves += 1
 
 func _start_puzzle_timer() -> void:
 	puzzle_time_left  = 15.0
@@ -318,11 +510,16 @@ func _build_store_overlay() -> void:
 	divider.position = Vector2(board_px / 2 - 105, 100)
 	store_overlay.add_child(divider)
 
+	var scroll = ScrollContainer.new()
+	scroll.position = Vector2(20, 124)
+	scroll.size = Vector2(board_px - 40, board_px - 210)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	store_overlay.add_child(scroll)
+
 	store_content = VBoxContainer.new()
-	store_content.position = Vector2(30, 128)
-	store_content.size = Vector2(board_px - 60, board_px - 210)
-	store_content.add_theme_constant_override("separation", 10)
-	store_overlay.add_child(store_content)
+	store_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	store_content.add_theme_constant_override("separation", 8)
+	scroll.add_child(store_content)
 
 	var fight_btn = Button.new()
 	fight_btn.text = "Fight Boss →"
@@ -336,7 +533,7 @@ func _show_store() -> void:
 	store_gold_label.text = "◆  %d gold available" % RunState.gold
 
 	for child in store_content.get_children():
-		child.free()
+		child.queue_free()
 
 	var upgradeable_pawns = RunState.army.keys().filter(
 		func(sq): return RunState.army[sq] == "wp"
@@ -409,8 +606,8 @@ func _upgrade_pawn(square: String, piece_type: String) -> void:
 	RunState.gold -= cost
 	RunState.army[square] = "w" + piece_type
 	print("⬆️ %s → w%s  ($%d spent, %d gold left)" % [square, piece_type, cost, RunState.gold])
-	_show_store()
 	_refresh_hud()
+	call_deferred("_show_store")
 
 # --- Puzzle loading ---
 
@@ -454,7 +651,8 @@ func _on_puzzle_complete() -> void:
 	RunState.puzzles_solved    += 1
 	RunState.puzzles_attempted += 1
 	var reward = 2 if current_puzzle_difficulty == "expert" else 1
-	RunState.gold += reward
+	RunState.gold        += reward
+	RunState.gold_earned += reward
 	RunState.earned_powerups.append("Extra Knight")
 
 	overlay_label.text = "Puzzle Cleared!\n+%d Gold  (Total: %d)" % [reward, RunState.gold]
@@ -475,32 +673,12 @@ func _on_puzzle_failed(_tile) -> void:
 
 func _on_match_over(result: String) -> void:
 	_stop_boss_timer()
-	if result.begins_with("checkmate_w"):
-		overlay_label.text = "Checkmate!\nYou Win!"
-		next_button.text   = "New Run →"
-		_style_button(next_button, Color(0.18, 0.48, 0.18))
-	elif result.begins_with("checkmate_b"):
-		overlay_label.text = "You Lose."
-		next_button.text   = "Try Again"
-		_style_button(next_button, Color(0.55, 0.12, 0.12))
-	elif result == "timeout":
-		overlay_label.text = "Out of Time!"
-		next_button.text   = "Try Again"
-		_style_button(next_button, Color(0.55, 0.12, 0.12))
-	else:
-		overlay_label.text = "Stalemate — Draw"
-		next_button.text   = "New Run →"
-		_style_button(next_button)
-	_show(overlay)
+	var won = result.begins_with("checkmate_w") or result == "stalemate"
+	_show_run_end(won)
 
 func _on_next_pressed() -> void:
 	_hide(overlay)
-	if RunState.current_phase == "boss":
-		RunState.reset_run()
-		_reset_board()
-		_refresh_hud()
-		_show(difficulty_overlay)
-	elif RunState.puzzles_attempted >= 5:
+	if RunState.puzzles_attempted >= 5:
 		_show_store()
 	else:
 		_reset_board()

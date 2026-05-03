@@ -13,7 +13,11 @@ public partial class StockfishInterface : Node
 	public string Variant { get; set; } = "chess";
 
 	[Export]
-	public int MultiPV { get; set; } = 3;
+	public int MultiPV { get; set; } = 1;
+
+	// Time budget per move in milliseconds
+	[Export]
+	public int MoveTimeMs { get; set; } = 1000;
 
 	// Last evaluation in centipawns, always from White's perspective (positive = White winning)
 	public int LastScoreCentipawns { get; private set; } = 0;
@@ -27,7 +31,7 @@ public partial class StockfishInterface : Node
 		bool whiteToMove = FenActiveColor(fen) == "w";
 		string chosenMove = null;
 
-		RunEngine(fen, "go depth 10", (line, candidates) =>
+		RunEngine(fen, $"go movetime {MoveTimeMs}", (line, candidates) =>
 		{
 			ParseScoreLine(line, whiteToMove);
 

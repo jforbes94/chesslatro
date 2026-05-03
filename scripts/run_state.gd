@@ -1,12 +1,15 @@
 extends Node
 
-var game_difficulty:   String = ""   # "easy" | "medium" | "hard" — set on start screen
+var game_difficulty:   String = ""   # "easy" | "medium" | "hard"
+var run_number:        int    = 1    # increments on boss win, never resets
 var current_level:     int    = 1
 var current_phase:     String = "puzzle"  # "puzzle" or "boss"
 var puzzles_solved:    int    = 0
 var puzzles_attempted: int    = 0
 var earned_powerups:   Array  = []
 var gold:              int    = 0
+var gold_earned:       int    = 0   # gold earned this run (shown on end screen)
+var boss_moves:        int    = 0   # White moves made in boss fight
 
 # Persistent army — survives across all runs, never reset
 var army: Dictionary = {
@@ -29,5 +32,7 @@ func reset_run() -> void:
 	puzzles_solved    = 0
 	puzzles_attempted = 0
 	gold              = 0
+	gold_earned       = 0
+	boss_moves        = 0
 	earned_powerups.clear()
-	# army intentionally preserved
+	# army and run_number intentionally preserved
