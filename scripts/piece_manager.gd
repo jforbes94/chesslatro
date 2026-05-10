@@ -6,13 +6,19 @@ const TILE_SIZE = Globals.TILE_SIZE
 
 @export var piece_theme: String = "alpha"
 
+var white_tint: Color = Color.WHITE
+var black_tint: Color = Color.WHITE
+
+func set_tints(w_tint: Color, b_tint: Color) -> void:
+	white_tint = w_tint
+	black_tint = b_tint
+
 func place_starting_pieces(parent: Node, game_state: Node, starting_positions: Dictionary = {}) -> void:
 	if starting_positions.is_empty():
 		starting_positions = LevelConfig.get_starting_positions(RunState.current_level)
 
 	if not "h8" in starting_positions or starting_positions["h8"] != "br":
 		GameStateManager.black_kingside_castling = false
-
 	if not "a8" in starting_positions or starting_positions["a8"] != "br":
 		GameStateManager.black_queenside_castling = false
 
@@ -22,8 +28,6 @@ func place_starting_pieces(parent: Node, game_state: Node, starting_positions: D
 		var tile := parent.get_node_or_null(square_name)
 		if tile:
 			tile.add_child(sprite)
-
-			# Update game state
 			var coords: Vector2i = game_state.square_to_indices(square_name)
 			game_state.set_piece_at(coords.x, coords.y, piece_code)
 
@@ -51,4 +55,5 @@ func create_piece_sprite(piece_code: String) -> TextureRect:
 	sprite.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	sprite.stretch_mode = TextureRect.STRETCH_SCALE
 	sprite.custom_minimum_size = Vector2(TILE_SIZE, TILE_SIZE)
+	sprite.modulate = white_tint if piece_code.begins_with("w") else black_tint
 	return sprite

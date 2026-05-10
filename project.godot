@@ -21,6 +21,7 @@ GameStateManager="*res://scripts/game_state_manager.gd"
 RunState="*res://scripts/run_state.gd"
 LevelConfig="*res://scripts/level_config.gd"
 PuzzleManager="*res://scripts/puzzle_manager.gd"
+StatsManager="*res://scripts/stats_manager.gd"
 
 [dotnet]
 

@@ -1,17 +1,23 @@
 extends Node
 
-var game_difficulty:   String = ""   # "easy" | "medium" | "hard"
-var run_number:        int    = 1    # increments on boss win, never resets
+var game_difficulty:   String = ""
+var run_number:        int    = 1
 var current_level:     int    = 1
-var current_phase:     String = "puzzle"  # "puzzle" or "boss"
-var puzzles_solved:    int    = 0
-var puzzles_attempted: int    = 0
+var current_phase:     String = "puzzle"
 var earned_powerups:   Array  = []
 var gold:              int    = 0
-var gold_earned:       int    = 0   # gold earned this run (shown on end screen)
-var boss_moves:        int    = 0   # White moves made in boss fight
+var gold_earned:       int    = 0
+var boss_moves:        int    = 0
 
-# Persistent army — survives across all runs, never reset
+# Map state
+var puzzles_solved:    int        = 0
+var consecutive_fails: int        = 0
+var map_layout:        Array      = []   # Array of floor arrays
+var map_floor:         int        = 0   # Current floor index
+var map_current_node:  Dictionary = {}  # Node being played
+var map_available:     Array      = []  # Available node indices in current floor
+
+# Persistent army — survives all runs
 var army: Dictionary = {
 	"a1": "wr", "b1": "wn", "c1": "wb", "d1": "wq",
 	"e1": "wk", "f1": "wb", "g1": "wn", "h1": "wr",
@@ -29,10 +35,14 @@ const BLACK_STANDARD: Dictionary = {
 func reset_run() -> void:
 	current_level     = 1
 	current_phase     = "puzzle"
-	puzzles_solved    = 0
-	puzzles_attempted = 0
 	gold              = 0
 	gold_earned       = 0
 	boss_moves        = 0
+	puzzles_solved    = 0
+	consecutive_fails = 0
+	map_layout.clear()
+	map_floor         = 0
+	map_current_node  = {}
+	map_available.clear()
 	earned_powerups.clear()
 	# army and run_number intentionally preserved

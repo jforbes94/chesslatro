@@ -228,7 +228,6 @@ func _make_ai_move() -> void:
 	apply_stockfish_move(move)
 
 func apply_stockfish_move(move: String) -> void:
-	await get_tree().create_timer(0.35).timeout
 	if move == null or move.length() < 4:
 		print("⚠️ Invalid move string:", move)
 		return
@@ -310,8 +309,10 @@ func remove_piece_from_tile(tile: ColorRect) -> void:
 			child.queue_free()
 
 func _get_tile_color(tile: ColorRect) -> Color:
-	var pos = game_state.square_to_indices(tile.name)
-	return Globals.COLOR_TILE_LIGHT if (pos.x + pos.y) % 2 == 0 else Globals.COLOR_TILE_DARK
+	var pos      = game_state.square_to_indices(tile.name)
+	var is_light = (pos.x + pos.y) % 2 == 0
+	var theme    = Globals.get_theme(RunState.run_number)
+	return theme["tile_light"] if is_light else theme["tile_dark"]
 
 # --- Promotion popup ---
 

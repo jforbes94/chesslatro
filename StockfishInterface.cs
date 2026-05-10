@@ -17,7 +17,7 @@ public partial class StockfishInterface : Node
 
 	// Time budget per move in milliseconds
 	[Export]
-	public int MoveTimeMs { get; set; } = 1000;
+	public int MoveTimeMs { get; set; } = 300;
 
 	// Last evaluation in centipawns, always from White's perspective (positive = White winning)
 	public int LastScoreCentipawns { get; private set; } = 0;

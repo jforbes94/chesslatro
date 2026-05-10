@@ -28,11 +28,32 @@ var store_gold_label: Label
 var store_content:    VBoxContainer
 
 var current_puzzle_difficulty: String = "medium"
+var current_puzzle_themes:    Array  = []
 var difficulty_overlay: ColorRect
 var main_menu_overlay:  ColorRect
 var run_end_overlay:    ColorRect
 var run_end_label:      Label
 var settings_panel:     ColorRect
+
+# Theme
+var bg_rect:        ColorRect
+var border_rect:    ColorRect
+var hud_panel_rect: ColorRect
+var hud_stripe:     ColorRect
+var current_theme:  Dictionary = {}
+
+# Map
+var map_overlay:      ColorRect
+var map_canvas_node:  Control
+var map_header_label: Label
+var map_gold_label:   Label
+var map_fails_label:  Label
+var map_node_buttons: Array = []
+var store_fight_btn:  Button
+var _store_in_map:    bool = false
+var stats_overlay:    ColorRect
+var stats_content:    VBoxContainer
+var reset_confirm:    ColorRect
 
 # Timers
 var puzzle_timer_active: bool  = false
@@ -52,6 +73,8 @@ func _ready() -> void:
 	_build_store_overlay()
 	_build_difficulty_screen()
 	_build_run_end_overlay()
+	_build_map_overlay()
+	_build_stats_overlay()
 	_build_main_menu()
 	movement_manager.match_over.connect(_on_match_over)
 	movement_manager.wrong_move.connect(_on_wrong_move)
@@ -65,12 +88,65 @@ func _ready() -> void:
 func _add_border() -> void:
 	var board_px    = TILE_SIZE * BOARD_SIZE
 	var border_size = 16
-	var border      = ColorRect.new()
-	border.color    = Color(0.16, 0.10, 0.05)
-	border.position = Vector2(-border_size, -border_size)
-	border.size     = Vector2(board_px + border_size * 2, board_px + border_size * 2)
-	border.z_index  = -1
-	add_child(border)
+
+	# Full-scene background — large enough to cover any camera view
+	bg_rect          = ColorRect.new()
+	bg_rect.color    = Color(0.05, 0.10, 0.04)
+	bg_rect.position = Vector2(-1200, -900)
+	bg_rect.size     = Vector2(2800, 2000)
+	bg_rect.z_index  = -2
+	add_child(bg_rect)
+
+	border_rect          = ColorRect.new()
+	border_rect.color    = Color(0.18, 0.10, 0.03)
+	border_rect.position = Vector2(-border_size, -border_size)
+	border_rect.size     = Vector2(board_px + border_size * 2, board_px + border_size * 2)
+	border_rect.z_index  = -1
+	add_child(border_rect)
+
+# --- Theme ---
+
+func _apply_theme(run_number: int) -> void:
+	current_theme = Globals.get_theme(run_number)
+
+	bg_rect.color     = current_theme["background"]
+	border_rect.color = current_theme["border"]
+	hud_panel_rect.color = current_theme["hud_bg"]
+	hud_stripe.color  = current_theme["accent"]
+
+	# Recolor board tiles
+	for tile in $BoardTiles.get_children():
+		var pos = GameStateManager.square_to_indices(tile.name)
+		var is_light = (pos.x + pos.y) % 2 == 0
+		if tile.color != movement_manager.COLOR_SELECTED and tile.color != movement_manager.COLOR_LAST_MOVE:
+			tile.color = current_theme["tile_light"] if is_light else current_theme["tile_dark"]
+
+	# Update piece manager tints and retint all existing sprites
+	piece_manager.set_tints(current_theme["white_tint"], current_theme["black_tint"])
+	for tile in $BoardTiles.get_children():
+		var pos    = GameStateManager.square_to_indices(tile.name)
+		var piece  = GameStateManager.get_piece_at(pos.x, pos.y)
+		if piece == "":
+			continue
+		var tint = current_theme["white_tint"] if piece.begins_with("w") else current_theme["black_tint"]
+		for child in tile.get_children():
+			if child is TextureRect:
+				child.modulate = tint
+
+	# Update overlay backgrounds
+	if is_instance_valid(overlay):
+		overlay.color = current_theme["overlay_bg"]
+	if is_instance_valid(store_overlay):
+		store_overlay.color = current_theme["overlay_bg"]
+
+	# Update label accent colors
+	level_label.add_theme_color_override("font_color", current_theme["accent"])
+	gold_label.add_theme_color_override("font_color", current_theme["accent"])
+	timer_label.add_theme_color_override("font_color", Color.WHITE)
+
+func _default_tile_is_light(tile_name: String) -> bool:
+	var pos = GameStateManager.square_to_indices(tile_name)
+	return (pos.x + pos.y) % 2 == 0
 
 # --- Button styling ---
 
@@ -135,6 +211,14 @@ func _build_main_menu() -> void:
 	_style_button(settings_btn, Color(0.28, 0.28, 0.38))
 	main_menu_overlay.add_child(settings_btn)
 
+	var stats_btn = Button.new()
+	stats_btn.text     = "Player Stats"
+	stats_btn.size     = Vector2(240, 48)
+	stats_btn.position = Vector2(cx - 120, 362)
+	stats_btn.pressed.connect(_show_stats)
+	_style_button(stats_btn, Color(0.18, 0.35, 0.45))
+	main_menu_overlay.add_child(stats_btn)
+
 	# Settings panel (hidden by default)
 	settings_panel = ColorRect.new()
 	settings_panel.color    = Color(0.10, 0.10, 0.18, 0.98)
@@ -173,6 +257,18 @@ func _build_main_menu() -> void:
 	version_lbl.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
 	version_lbl.position = Vector2(cx - 60, board_px - 36)
 	main_menu_overlay.add_child(version_lbl)
+
+func _on_map_menu_pressed() -> void:
+	# Abandon current run and return to main menu
+	_stop_puzzle_timer()
+	_stop_boss_timer()
+	_hide(map_overlay)
+	_hide(overlay)
+	_hide(store_overlay)
+	RunState.reset_run()
+	_reset_board()
+	_refresh_hud()
+	_show(main_menu_overlay)
 
 func _on_main_menu_new_run() -> void:
 	_hide(main_menu_overlay)
@@ -263,8 +359,10 @@ func _on_run_end_play_again() -> void:
 	run_end_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	$BoardTiles.modulate         = Color.WHITE
 	RunState.reset_run()
+	_apply_theme(RunState.run_number)
 	_reset_board()
-	_load_puzzle()
+	_generate_map()
+	_show_map()
 	_refresh_hud()
 
 func _on_run_end_main_menu() -> void:
@@ -385,7 +483,9 @@ func _select_difficulty(difficulty: String) -> void:
 	RunState.game_difficulty = difficulty
 	PuzzleManager.load_for_difficulty(difficulty)
 	_hide(difficulty_overlay)
-	_load_puzzle()
+	_apply_theme(RunState.run_number)
+	_generate_map()
+	_show_map()
 
 # --- HUD ---
 
@@ -395,18 +495,18 @@ func _build_hud() -> void:
 	var panel_w   = 180
 
 	# Background panel
-	var hud_panel = ColorRect.new()
-	hud_panel.color    = Color(0.10, 0.10, 0.15, 0.92)
-	hud_panel.position = Vector2(hud_x, 0)
-	hud_panel.size     = Vector2(panel_w, 160)
-	add_child(hud_panel)
+	hud_panel_rect          = ColorRect.new()
+	hud_panel_rect.color    = Color(0.10, 0.10, 0.15, 0.92)
+	hud_panel_rect.position = Vector2(hud_x, 0)
+	hud_panel_rect.size     = Vector2(panel_w, 160)
+	add_child(hud_panel_rect)
 
-	# Gold accent stripe on left edge
-	var stripe = ColorRect.new()
-	stripe.color    = COLOR_GOLD
-	stripe.position = Vector2(hud_x, 0)
-	stripe.size     = Vector2(3, 160)
-	add_child(stripe)
+	# Accent stripe on left edge
+	hud_stripe          = ColorRect.new()
+	hud_stripe.color    = COLOR_GOLD
+	hud_stripe.position = Vector2(hud_x, 0)
+	hud_stripe.size     = Vector2(3, 160)
+	add_child(hud_stripe)
 
 	level_label = Label.new()
 	level_label.position = Vector2(hud_x + 12, 8)
@@ -438,6 +538,18 @@ func _build_hud() -> void:
 	timer_label.add_theme_color_override("font_color", Color.WHITE)
 	add_child(timer_label)
 
+	var hud_menu_btn = Button.new()
+	hud_menu_btn.text     = "Menu"
+	hud_menu_btn.size     = Vector2(panel_w - 16, 30)
+	hud_menu_btn.position = Vector2(hud_x + 8, 170)
+	hud_menu_btn.pressed.connect(_on_map_menu_pressed)
+	_style_button(hud_menu_btn, Color(0.22, 0.22, 0.30))
+	add_child(hud_menu_btn)
+
+	# Expand hud panel to fit
+	hud_panel_rect.size = Vector2(panel_w, 208)
+	hud_stripe.size     = Vector2(3, 208)
+
 	# Result overlay
 	overlay = ColorRect.new()
 	overlay.color = Color(0.04, 0.04, 0.08, 0.88)
@@ -466,15 +578,17 @@ func _build_hud() -> void:
 	_refresh_hud()
 
 func _refresh_hud() -> void:
+	var theme = Globals.get_theme(RunState.run_number)
 	if RunState.current_phase == "puzzle":
-		level_label.text    = "Level %d" % RunState.current_level
+		level_label.text    = theme["kingdom"]
 		turn_label.text     = "White to Play"
-		progress_label.text = "Puzzle %d / 5" % RunState.puzzles_attempted
+		var floor_display   = min(RunState.map_floor + 1, 3)
+		progress_label.text = "Floor %d / 3" % floor_display
 		gold_label.text     = "◆  %d gold" % RunState.gold
 	else:
-		level_label.text    = "Boss Fight"
-		turn_label.text     = ""
-		progress_label.text = "%d power up(s)" % RunState.earned_powerups.size()
+		level_label.text    = "⚔  " + theme["boss"]
+		turn_label.text     = theme["kingdom"]
+		progress_label.text = "%d upgrade(s)" % RunState.earned_powerups.size()
 		gold_label.text     = "◆  %d gold" % RunState.gold
 
 # --- Store overlay ---
@@ -521,13 +635,13 @@ func _build_store_overlay() -> void:
 	store_content.add_theme_constant_override("separation", 8)
 	scroll.add_child(store_content)
 
-	var fight_btn = Button.new()
-	fight_btn.text = "Fight Boss →"
-	fight_btn.size = Vector2(210, 50)
-	fight_btn.position = Vector2(board_px / 2 - 105, board_px - 68)
-	fight_btn.pressed.connect(_start_boss_phase)
-	_style_button(fight_btn, Color(0.55, 0.12, 0.12))
-	store_overlay.add_child(fight_btn)
+	store_fight_btn = Button.new()
+	store_fight_btn.text = "Fight Boss →"
+	store_fight_btn.size = Vector2(210, 50)
+	store_fight_btn.position = Vector2(board_px / 2 - 105, board_px - 68)
+	store_fight_btn.pressed.connect(_on_store_done)
+	_style_button(store_fight_btn, Color(0.55, 0.12, 0.12))
+	store_overlay.add_child(store_fight_btn)
 
 func _show_store() -> void:
 	store_gold_label.text = "◆  %d gold available" % RunState.gold
@@ -577,6 +691,7 @@ func _show_store() -> void:
 			spacer.custom_minimum_size = Vector2(0, 1)
 			store_content.add_child(spacer)
 
+	store_fight_btn.text = "Continue →" if _store_in_map else "Fight Boss →"
 	_show(store_overlay)
 
 func _upgrade_cost(square: String, piece_type: String) -> int:
@@ -648,26 +763,35 @@ func _on_wrong_move(tile: ColorRect) -> void:
 
 func _on_puzzle_complete() -> void:
 	_stop_puzzle_timer()
-	RunState.puzzles_solved    += 1
-	RunState.puzzles_attempted += 1
-	var reward = 2 if current_puzzle_difficulty == "expert" else 1
+	StatsManager.record_attempt(current_puzzle_themes, current_puzzle_difficulty, true)
+	RunState.consecutive_fails = 0
+	RunState.puzzles_solved   += 1
+	var reward = RunState.map_current_node.get("reward", 1)
 	RunState.gold        += reward
 	RunState.gold_earned += reward
-	RunState.earned_powerups.append("Extra Knight")
-
-	overlay_label.text = "Puzzle Cleared!\n+%d Gold  (Total: %d)" % [reward, RunState.gold]
-	next_button.text   = "Visit Store →" if RunState.puzzles_attempted >= 5 else "Next Puzzle →"
-	_style_button(next_button, Color(0.18, 0.48, 0.18) if RunState.puzzles_attempted < 5 else COLOR_BTN)
+	_complete_current_node()
+	overlay_label.text = "Puzzle Cleared!\n+$%d Gold  (Total: %d)" % [reward, RunState.gold]
+	next_button.text   = "Continue →"
+	_style_button(next_button, Color(0.18, 0.48, 0.18))
 	_show(overlay)
 	_refresh_hud()
 
 func _on_puzzle_failed(_tile) -> void:
 	_stop_puzzle_timer()
-	RunState.puzzles_attempted += 1
-	await get_tree().create_timer(0.5).timeout
-	overlay_label.text = "Puzzle Failed\n+0 Gold"
-	next_button.text   = "Visit Store →" if RunState.puzzles_attempted >= 5 else "Next Puzzle →"
-	_style_button(next_button)
+	StatsManager.record_attempt(current_puzzle_themes, current_puzzle_difficulty, false)
+	RunState.consecutive_fails += 1
+	var penalty = RunState.map_current_node.get("penalty", 0)
+	RunState.gold = max(0, RunState.gold - penalty)
+	if RunState.consecutive_fails >= 2:
+		await get_tree().create_timer(0.5).timeout
+		_show_run_end(false)
+		return
+	_complete_current_node()
+	var warn = "\n⚠  One more fail = run over!" if RunState.consecutive_fails == 1 else ""
+	await get_tree().create_timer(0.4).timeout
+	overlay_label.text = "Puzzle Failed!\n-$%d Gold%s" % [penalty, warn]
+	next_button.text   = "Continue →"
+	_style_button(next_button, Color(0.55, 0.12, 0.12))
 	_show(overlay)
 	_refresh_hud()
 
@@ -678,17 +802,15 @@ func _on_match_over(result: String) -> void:
 
 func _on_next_pressed() -> void:
 	_hide(overlay)
-	if RunState.puzzles_attempted >= 5:
-		_show_store()
-	else:
-		_reset_board()
-		_load_puzzle()
+	_reset_board()
+	_show_map()
 
 # --- Phase transitions ---
 
 func _start_boss_phase() -> void:
 	_hide(store_overlay)
 	RunState.current_phase = "boss"
+	_apply_theme(RunState.run_number)
 	movement_manager.start_boss()
 	_clear_board()
 
@@ -762,7 +884,10 @@ func _clear_board() -> void:
 
 func _default_tile_color(tile_name: String) -> Color:
 	var pos = GameStateManager.square_to_indices(tile_name)
-	return Globals.COLOR_TILE_LIGHT if (pos.x + pos.y) % 2 == 0 else Globals.COLOR_TILE_DARK
+	var is_light = (pos.x + pos.y) % 2 == 0
+	if current_theme.is_empty():
+		return Globals.COLOR_TILE_LIGHT if is_light else Globals.COLOR_TILE_DARK
+	return current_theme["tile_light"] if is_light else current_theme["tile_dark"]
 
 # --- Board drawing ---
 
@@ -787,7 +912,7 @@ func draw_board() -> void:
 func _input(event: InputEvent) -> void:
 	if not (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT):
 		return
-	if overlay.visible or store_overlay.visible or difficulty_overlay.visible:
+	if overlay.visible or store_overlay.visible or difficulty_overlay.visible or map_overlay.visible or stats_overlay.visible:
 		return
 
 	var vp_pos    = get_viewport().get_mouse_position()
@@ -803,3 +928,467 @@ func _input(event: InputEvent) -> void:
 	var tile = $BoardTiles.get_node_or_null(tile_name)
 	if tile:
 		movement_manager.handle_tile_click(tile)
+
+# ═══════════════════════════════════════════════════════════════════
+# MAP SYSTEM
+# ═══════════════════════════════════════════════════════════════════
+
+# Node positions: [floor][node] = Vector2 top-left of button
+const MAP_POSITIONS = [
+	[Vector2(55, 210), Vector2(55, 385)],
+	[Vector2(205, 155), Vector2(205, 295), Vector2(205, 435)],
+	[Vector2(355, 210), Vector2(355, 385)],
+	[Vector2(490, 288)],
+]
+const MAP_NODE_W = 120
+const MAP_NODE_H = 75
+
+func _build_map_overlay() -> void:
+	var board_px = TILE_SIZE * BOARD_SIZE
+
+	map_overlay = ColorRect.new()
+	map_overlay.color       = Color(0.04, 0.04, 0.08, 0.97)
+	map_overlay.size        = Vector2(board_px, board_px)
+	map_overlay.position    = Vector2.ZERO
+	map_overlay.z_index     = 55
+	map_overlay.visible     = false
+	map_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(map_overlay)
+
+	map_header_label = Label.new()
+	map_header_label.add_theme_font_size_override("font_size", 17)
+	map_header_label.position = Vector2(14, 10)
+	map_overlay.add_child(map_header_label)
+
+	map_gold_label = Label.new()
+	map_gold_label.add_theme_font_size_override("font_size", 13)
+	map_gold_label.add_theme_color_override("font_color", COLOR_GOLD)
+	map_gold_label.position = Vector2(14, 38)
+	map_overlay.add_child(map_gold_label)
+
+	map_fails_label = Label.new()
+	map_fails_label.add_theme_font_size_override("font_size", 12)
+	map_fails_label.position = Vector2(14, 60)
+	map_overlay.add_child(map_fails_label)
+
+	# Floor column labels
+	var floor_labels = ["Floor 1", "Floor 2", "Floor 3", "Boss"]
+	var floor_xs     = [55, 205, 355, 490]
+	for i in 4:
+		var lbl = Label.new()
+		lbl.text = floor_labels[i]
+		lbl.add_theme_font_size_override("font_size", 11)
+		lbl.add_theme_color_override("font_color", Color(0.55, 0.55, 0.55))
+		lbl.position = Vector2(floor_xs[i], 120)
+		map_overlay.add_child(lbl)
+
+	# Canvas for connection lines
+	var canvas_script = load("res://scripts/map_canvas.gd")
+	map_canvas_node = Control.new()
+	map_canvas_node.set_script(canvas_script)
+	map_canvas_node.size        = Vector2(board_px, board_px)
+	map_canvas_node.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	map_overlay.add_child(map_canvas_node)
+
+	var hint = Label.new()
+	hint.text = "Select a node to proceed"
+	hint.add_theme_font_size_override("font_size", 11)
+	hint.add_theme_color_override("font_color", Color(0.5, 0.5, 0.5))
+	hint.position = Vector2(board_px / 2 - 80, board_px - 24)
+	map_overlay.add_child(hint)
+
+	var menu_btn = Button.new()
+	menu_btn.text     = "Main Menu"
+	menu_btn.size     = Vector2(110, 34)
+	menu_btn.position = Vector2(board_px - 120, 10)
+	menu_btn.pressed.connect(_on_map_menu_pressed)
+	_style_button(menu_btn, Color(0.22, 0.22, 0.30))
+	map_overlay.add_child(menu_btn)
+
+func _generate_map() -> void:
+	var tiers = Globals.DIFFICULTY_TIERS.get(RunState.game_difficulty, ["beginner", "intermediate", "advanced"])
+
+	var pattern = randi() % 3
+	var f1_conn: Array
+	var f2_conn: Array
+	match pattern:
+		0: f1_conn = [[0,1],[1,2]]; f2_conn = [[0],[0,1],[1]]
+		1: f1_conn = [[0,1],[0,2]]; f2_conn = [[0,1],[1],[0]]
+		_: f1_conn = [[0,2],[1,2]]; f2_conn = [[0],[0,1],[1]]
+
+	# Floor 2: 3 puzzle/elite nodes (no shop on map)
+	var f2_types = ["puzzle", "elite", "puzzle"]
+	f2_types.shuffle()
+
+	# Floor 3: 2 puzzle/elite — no connections needed (shop follows automatically)
+	var f3_types = ["puzzle", "elite"]
+	f3_types.shuffle()
+
+	RunState.map_layout = [
+		[
+			_make_node("puzzle", tiers[0], f1_conn[0]),
+			_make_node("puzzle", tiers[1], f1_conn[1]),
+		],
+		[
+			_make_node(f2_types[0], tiers[1], f2_conn[0]),
+			_make_node(f2_types[1], tiers[2], f2_conn[1]),
+			_make_node(f2_types[2], tiers[1], f2_conn[2]),
+		],
+		[
+			_make_node(f3_types[0], tiers[2], []),
+			_make_node(f3_types[1], tiers[2], []),
+		],
+		# No boss node — shop opens automatically after floor 3
+	]
+
+	RunState.map_floor     = 0
+	RunState.map_available = [0, 1]
+
+func _make_node(type: String, tier: String, connections: Array) -> Dictionary:
+	var node = {"type": type, "tier": tier, "connections": connections,
+				"reward": 0, "penalty": 0, "completed": false}
+	if type == "boss" or type == "shop":
+		return node
+	if Globals.TIER_DATA.has(tier):
+		var td = Globals.TIER_DATA[tier]
+		node["reward"]  = td["reward"] * 2 / 2 if type == "puzzle" else int(td["reward"] * 1.5)
+		node["penalty"] = td["penalty"]
+		if type == "puzzle":
+			node["reward"] = td["reward"]
+	return node
+
+func _show_map() -> void:
+	# All puzzle floors cleared — open shop before boss
+	if RunState.map_floor >= RunState.map_layout.size():
+		_store_in_map = false
+		_show_store()
+		return
+
+	var theme = Globals.get_theme(RunState.run_number)
+
+	map_header_label.text = "%s  —  Run %d" % [theme["kingdom"], RunState.run_number]
+	map_header_label.add_theme_color_override("font_color", theme["accent"])
+	map_gold_label.text   = "◆  %d gold" % RunState.gold
+
+	if RunState.consecutive_fails == 0:
+		map_fails_label.text = ""
+	else:
+		map_fails_label.text = "⚠  Warning: 1 more fail ends the run"
+		map_fails_label.add_theme_color_override("font_color", Color(1.0, 0.4, 0.1))
+
+	# Clear old buttons
+	for btn in map_node_buttons:
+		if is_instance_valid(btn):
+			btn.queue_free()
+	map_node_buttons.clear()
+	map_canvas_node.clear_lines()
+
+	# Build node centers for line drawing
+	var centers: Array = []
+	for fi in RunState.map_layout.size():
+		var floor_centers = []
+		for ni in RunState.map_layout[fi].size():
+			var pos = MAP_POSITIONS[fi][ni]
+			floor_centers.append(pos + Vector2(MAP_NODE_W / 2.0, MAP_NODE_H / 2.0))
+		centers.append(floor_centers)
+
+	# Draw connection lines
+	for fi in RunState.map_layout.size() - 1:
+		for ni in RunState.map_layout[fi].size():
+			var node = RunState.map_layout[fi][ni]
+			var from_c = centers[fi][ni]
+			for ti in node.get("connections", []):
+				if ti < centers[fi + 1].size():
+					var to_c  = centers[fi + 1][ti]
+					var col: Color
+					if node["completed"]:
+						col = Color(0.35, 0.65, 0.35, 0.9)
+					elif fi == RunState.map_floor and ni in RunState.map_available:
+						col = Color(0.65, 0.65, 0.65, 0.5)
+					else:
+						col = Color(0.25, 0.25, 0.25, 0.4)
+					map_canvas_node.add_line(from_c, to_c, col)
+
+	# Create node buttons
+	for fi in RunState.map_layout.size():
+		for ni in RunState.map_layout[fi].size():
+			var node     = RunState.map_layout[fi][ni]
+			var pos      = MAP_POSITIONS[fi][ni]
+			var avail    = (fi == RunState.map_floor and ni in RunState.map_available)
+			var done     = node["completed"]
+			var locked   = fi > RunState.map_floor or (fi == RunState.map_floor and not ni in RunState.map_available)
+			var btn      = _make_map_button(node, pos, avail, done, locked, theme)
+			if avail:
+				btn.pressed.connect(_on_map_node_clicked.bind(fi, ni))
+			map_overlay.add_child(btn)
+			map_node_buttons.append(btn)
+
+	_show(map_overlay)
+
+func _make_map_button(node: Dictionary, pos: Vector2, avail: bool, done: bool, locked: bool, theme: Dictionary) -> Button:
+	var btn = Button.new()
+	btn.position   = pos
+	btn.size       = Vector2(MAP_NODE_W, MAP_NODE_H)
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.clip_text  = false
+
+	var icon = "♟" ; var type_lbl = "Puzzle"
+	match node["type"]:
+		"elite": icon = "⚡" ; type_lbl = "Elite"
+		"shop":  icon = "⚒" ; type_lbl = "Shop"
+		"boss":  icon = "⚔" ; type_lbl = "BOSS"
+
+	var tier_lbl = Globals.TIER_DATA.get(node.get("tier",""), {}).get("label", "")
+	var reward_lbl = ""
+	if node["type"] in ["puzzle","elite"]:
+		reward_lbl = "+$%d / -%d" % [node["reward"], node["penalty"]]
+	elif node["type"] == "shop":
+		reward_lbl = "Upgrades"
+	elif node["type"] == "boss":
+		reward_lbl = theme["boss"]
+
+	btn.text = "%s %s\n%s\n%s" % [icon, type_lbl, tier_lbl, reward_lbl]
+
+	var col: Color
+	if done:
+		col = Color(0.18, 0.35, 0.18, 0.8)
+	elif locked:
+		col = Color(0.10, 0.10, 0.14, 0.6)
+	else:
+		match node["type"]:
+			"puzzle": col = Color(0.14, 0.32, 0.55)
+			"elite":  col = Color(0.50, 0.25, 0.05)
+			"shop":   col = Color(0.15, 0.38, 0.15)
+			"boss":   col = Color(0.50, 0.08, 0.08)
+			_:        col = Color(0.2, 0.2, 0.3)
+
+	_style_button(btn, col)
+	if locked:
+		btn.disabled = true
+		btn.modulate = Color(0.45, 0.45, 0.45, 0.7)
+	elif done:
+		btn.disabled = true
+
+	return btn
+
+func _on_map_node_clicked(floor_idx: int, node_idx: int) -> void:
+	var node = RunState.map_layout[floor_idx][node_idx]
+	RunState.map_current_node = node
+	_hide(map_overlay)
+	_load_map_puzzle(node["tier"])
+
+func _load_map_puzzle(tier: String) -> void:
+	var puzzle = PuzzleManager.get_puzzle_for_tier(tier)
+	if puzzle.is_empty():
+		push_error("No puzzle for tier: " + tier)
+		return
+	var moves: Array = puzzle["moves"]
+	if moves.size() < 2:
+		_complete_current_node()
+		_show_map()
+		return
+	print("🧩 %s  rating=%d  tier=%s" % [puzzle["id"], puzzle["rating"], tier])
+	current_puzzle_difficulty = puzzle.get("difficulty", tier)
+	current_puzzle_themes     = puzzle.get("themes", [])
+	_reset_board()
+	GameStateManager.load_from_fen(puzzle["fen"])
+	piece_manager.place_pieces_from_board_state($BoardTiles, GameStateManager)
+	movement_manager.apply_setup_move(moves[0])
+	movement_manager.start_puzzle(moves.slice(1))
+	_start_puzzle_timer()
+	_refresh_hud()
+
+func _complete_current_node() -> void:
+	var floor = RunState.map_floor
+	for i in RunState.map_layout[floor].size():
+		if RunState.map_layout[floor][i] == RunState.map_current_node:
+			RunState.map_layout[floor][i]["completed"] = true
+			RunState.map_floor   += 1
+			var conns = RunState.map_current_node.get("connections", [])
+			RunState.map_available = conns if not conns.is_empty() else [0]
+			return
+
+# ═══════════════════════════════════════════════════════════════════
+# STATS SCREEN
+# ═══════════════════════════════════════════════════════════════════
+
+func _build_stats_overlay() -> void:
+	var board_px = TILE_SIZE * BOARD_SIZE
+
+	stats_overlay = ColorRect.new()
+	stats_overlay.color       = Color(0.05, 0.05, 0.10, 0.98)
+	stats_overlay.size        = Vector2(board_px, board_px)
+	stats_overlay.position    = Vector2.ZERO
+	stats_overlay.z_index     = 65
+	stats_overlay.visible     = false
+	stats_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(stats_overlay)
+
+	var title = Label.new()
+	title.text = "Player Stats"
+	title.add_theme_font_size_override("font_size", 28)
+	title.add_theme_color_override("font_color", COLOR_GOLD)
+	title.position = Vector2(board_px / 2 - 80, 18)
+	stats_overlay.add_child(title)
+
+	# Scrollable content
+	var scroll = ScrollContainer.new()
+	scroll.position = Vector2(16, 65)
+	scroll.size     = Vector2(board_px - 32, board_px - 145)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	stats_overlay.add_child(scroll)
+
+	stats_content = VBoxContainer.new()
+	stats_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	stats_content.add_theme_constant_override("separation", 6)
+	scroll.add_child(stats_content)
+
+	# Back button
+	var back_btn = Button.new()
+	back_btn.text     = "← Back"
+	back_btn.size     = Vector2(140, 40)
+	back_btn.position = Vector2(16, board_px - 58)
+	back_btn.pressed.connect(_on_stats_back)
+	_style_button(back_btn, Color(0.28, 0.28, 0.38))
+	stats_overlay.add_child(back_btn)
+
+	# Reset button
+	var reset_btn = Button.new()
+	reset_btn.text     = "Reset Stats"
+	reset_btn.size     = Vector2(140, 40)
+	reset_btn.position = Vector2(board_px - 156, board_px - 58)
+	reset_btn.pressed.connect(_on_stats_reset_pressed)
+	_style_button(reset_btn, Color(0.55, 0.12, 0.12))
+	stats_overlay.add_child(reset_btn)
+
+	# Reset confirmation panel
+	reset_confirm = ColorRect.new()
+	reset_confirm.color    = Color(0.08, 0.05, 0.05, 0.98)
+	reset_confirm.size     = Vector2(320, 140)
+	reset_confirm.position = Vector2(board_px / 2 - 160, board_px / 2 - 70)
+	reset_confirm.visible  = false
+	reset_confirm.mouse_filter = Control.MOUSE_FILTER_STOP
+	stats_overlay.add_child(reset_confirm)
+
+	var confirm_lbl = Label.new()
+	confirm_lbl.text = "Reset all stats?\nThis cannot be undone."
+	confirm_lbl.add_theme_font_size_override("font_size", 15)
+	confirm_lbl.add_theme_color_override("font_color", Color.WHITE)
+	confirm_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	confirm_lbl.position = Vector2(20, 16)
+	confirm_lbl.size     = Vector2(280, 60)
+	confirm_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD
+	reset_confirm.add_child(confirm_lbl)
+
+	var yes_btn = Button.new()
+	yes_btn.text     = "Yes, Reset"
+	yes_btn.size     = Vector2(130, 38)
+	yes_btn.position = Vector2(16, 90)
+	yes_btn.pressed.connect(_on_stats_reset_confirmed)
+	_style_button(yes_btn, Color(0.55, 0.12, 0.12))
+	reset_confirm.add_child(yes_btn)
+
+	var no_btn = Button.new()
+	no_btn.text     = "Cancel"
+	no_btn.size     = Vector2(130, 38)
+	no_btn.position = Vector2(170, 90)
+	no_btn.pressed.connect(func(): reset_confirm.visible = false)
+	_style_button(no_btn, Color(0.28, 0.28, 0.38))
+	reset_confirm.add_child(no_btn)
+
+func _show_stats() -> void:
+	_hide(main_menu_overlay)
+	reset_confirm.visible = false
+
+	for child in stats_content.get_children():
+		child.queue_free()
+
+	await get_tree().process_frame
+
+	var sm = StatsManager
+
+	# Overall
+	_stats_section("Overall")
+	_stats_row("Total Puzzles",
+		"%d attempted  /  %d solved  (%s)" % [
+			sm.total_attempted, sm.total_solved,
+			sm.win_pct(sm.total_attempted, sm.total_solved)
+		], COLOR_GOLD)
+
+	# By tier
+	_stats_section("By Difficulty Tier")
+	var tier_order = ["beginner","intermediate","advanced","club","expert","master","grandmaster","elite"]
+	for tier in tier_order:
+		if sm.by_tier.has(tier):
+			var d = sm.by_tier[tier]
+			var label_name = Globals.TIER_DATA.get(tier, {}).get("label", tier.capitalize())
+			_stats_row(label_name,
+				"%d / %d  (%s)" % [d["solved"], d["attempted"], sm.win_pct(d["attempted"], d["solved"])],
+				Color.WHITE)
+
+	# By category
+	_stats_section("By Puzzle Category")
+	var categories = sm.by_category.keys()
+	categories.sort_custom(func(a, b):
+		return sm.by_category[a]["attempted"] > sm.by_category[b]["attempted"]
+	)
+	for cat in categories:
+		var d = sm.by_category[cat]
+		var display = cat.replace("In", " in ").replace("Mate", "Mate ")
+		display = display.left(1).to_upper() + display.substr(1)
+		_stats_row(display,
+			"%d / %d  (%s)" % [d["solved"], d["attempted"], sm.win_pct(d["attempted"], d["solved"])],
+			Color(0.85, 0.85, 0.85))
+
+	_show(stats_overlay)
+
+func _stats_section(title: String) -> void:
+	var lbl = Label.new()
+	lbl.text = title
+	lbl.add_theme_font_size_override("font_size", 14)
+	lbl.add_theme_color_override("font_color", COLOR_GOLD)
+	stats_content.add_child(lbl)
+	var div = ColorRect.new()
+	div.color = Color(0.35, 0.28, 0.10, 0.6)
+	div.custom_minimum_size = Vector2(0, 2)
+	stats_content.add_child(div)
+
+func _stats_row(label: String, value: String, col: Color = Color.WHITE) -> void:
+	var row = HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+
+	var lbl = Label.new()
+	lbl.text = label
+	lbl.add_theme_font_size_override("font_size", 12)
+	lbl.add_theme_color_override("font_color", col)
+	lbl.custom_minimum_size = Vector2(160, 0)
+	row.add_child(lbl)
+
+	var val = Label.new()
+	val.text = value
+	val.add_theme_font_size_override("font_size", 12)
+	val.add_theme_color_override("font_color", col)
+	row.add_child(val)
+
+	stats_content.add_child(row)
+
+func _on_stats_back() -> void:
+	_hide(stats_overlay)
+	_show(main_menu_overlay)
+
+func _on_stats_reset_pressed() -> void:
+	reset_confirm.visible = true
+
+func _on_stats_reset_confirmed() -> void:
+	StatsManager.reset()
+	reset_confirm.visible = false
+	_show_stats()
+
+func _on_store_done() -> void:
+	_hide(store_overlay)
+	if _store_in_map:
+		_store_in_map = false
+		_complete_current_node()
+		_show_map()
+	else:
+		_start_boss_phase()

@@ -17,7 +17,23 @@ func load_for_difficulty(difficulty: String) -> void:
 		puzzles = data["puzzles"]
 		print("✅ Loaded %d puzzles (%s)" % [puzzles.size(), difficulty])
 
-func get_puzzle_for_level(level: int) -> Dictionary:
+func get_puzzle_for_tier(tier: String) -> Dictionary:
+	var matches = puzzles.filter(func(p):
+		return p.get("difficulty", "") == tier and not used_ids.has(p["id"])
+	)
+	if matches.is_empty():
+		for p in puzzles:
+			if p.get("difficulty", "") == tier:
+				used_ids.erase(p["id"])
+		matches = puzzles.filter(func(p): return p.get("difficulty", "") == tier)
+	if matches.is_empty():
+		push_error("No puzzles for tier: " + tier)
+		return {}
+	var puzzle = matches[randi() % matches.size()]
+	used_ids.append(puzzle["id"])
+	return puzzle
+
+func get_puzzle_for_level(_level: int) -> Dictionary:
 	var matches = puzzles.filter(func(p):
 		return not used_ids.has(p["id"])
 	)
